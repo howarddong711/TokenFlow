@@ -41,7 +41,7 @@ export function ApiKeyDialog({
   const [apiKey, setApiKey] = useState("");
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
       setApiKey("");
     }
   }, [open]);

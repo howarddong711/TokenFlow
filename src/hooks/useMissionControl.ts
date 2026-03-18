@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildMissionQueue,
   buildProviderHealthCards,
@@ -130,31 +130,7 @@ export function useMissionControl(args: {
     window.localStorage.setItem(AUTO_REFRESH_STORAGE_KEY, JSON.stringify(autoRefreshLedger));
   }, [autoRefreshLedger]);
 
-  useEffect(() => {
-    const candidates = queue.filter((item) => {
-      if (item.kind !== "refresh" || !item.accountId) {
-        return false;
-      }
-      if (item.priority === "high" && prefs.autoRefreshCritical) {
-        return true;
-      }
-      if (item.priority !== "high" && prefs.autoRefreshStale) {
-        return true;
-      }
-      return false;
-    });
-
-    for (const item of candidates) {
-      const lastRunAt = autoRefreshLedger[item.accountId!];
-      if (lastRunAt && Date.now() - Date.parse(lastRunAt) < AUTO_COOLDOWN_MS) {
-        continue;
-      }
-
-      void executeRefresh(item.accountId!, item.providerId, item.title, true);
-    }
-  }, [autoRefreshLedger, prefs.autoRefreshCritical, prefs.autoRefreshStale, queue]);
-
-  const executeRefresh = async (
+  const executeRefresh = useCallback(async (
     accountId: string,
     providerId: ProviderId,
     title: string,
@@ -190,9 +166,9 @@ export function useMissionControl(args: {
       };
       setRuns((current) => [...current, run].slice(-160));
     }
-  };
+  }, [refreshAccount]);
 
-  const executeRepair = async (accountId: string, providerId: ProviderId, title: string) => {
+  const executeRepair = useCallback(async (accountId: string, providerId: ProviderId, title: string) => {
     const now = new Date().toISOString();
     try {
       await repairAccount(accountId);
@@ -220,7 +196,31 @@ export function useMissionControl(args: {
       };
       setRuns((current) => [...current, run].slice(-160));
     }
-  };
+  }, [repairAccount]);
+
+  useEffect(() => {
+    const candidates = queue.filter((item) => {
+      if (item.kind !== "refresh" || !item.accountId) {
+        return false;
+      }
+      if (item.priority === "high" && prefs.autoRefreshCritical) {
+        return true;
+      }
+      if (item.priority !== "high" && prefs.autoRefreshStale) {
+        return true;
+      }
+      return false;
+    });
+
+    for (const item of candidates) {
+      const lastRunAt = autoRefreshLedger[item.accountId!];
+      if (lastRunAt && Date.now() - Date.parse(lastRunAt) < AUTO_COOLDOWN_MS) {
+        continue;
+      }
+
+      void executeRefresh(item.accountId!, item.providerId, item.title, true);
+    }
+  }, [autoRefreshLedger, executeRefresh, prefs.autoRefreshCritical, prefs.autoRefreshStale, queue]);
 
   return {
     prefs,

@@ -3,6 +3,7 @@ name = "tokenflow"
 version = "0.1.0"
 description = "Windows desktop dashboard for AI coding accounts, token usage, and provider-native quota windows"
 authors = ["Howard Dong"]
+license = "MIT"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
