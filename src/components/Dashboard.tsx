@@ -1,4 +1,4 @@
-import { type ReactNode, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -315,17 +315,18 @@ export function Dashboard() {
   );
   const deferredRequestLogs = useDeferredValue(filteredRequestLogs);
   const deferredAppLogs = useDeferredValue(logCenter.appLogs);
+  const refreshLogCenter = logCenter.refresh;
 
-  const handleRefreshAll = async () => {
+  const handleRefreshAll = useCallback(async () => {
     if (refreshingAll) return;
     setRefreshingAll(true);
     try {
       await refreshAll();
-      await logCenter.refresh();
+      await refreshLogCenter();
     } finally {
       setRefreshingAll(false);
     }
-  };
+  }, [refreshAll, refreshLogCenter, refreshingAll]);
 
   const handleCopyLogs = async (entries: typeof logCenter.appLogs) => {
     await navigator.clipboard.writeText(
@@ -607,11 +608,12 @@ function DashboardPage({
     });
   }, [monthlyBars, monthlyRequestBars, providerSummaries]);
 
-  useEffect(() => {
-    if (activeChartProviderId && !chartProviderIds.includes(activeChartProviderId)) {
-      setActiveChartProviderId(null);
-    }
-  }, [activeChartProviderId, chartProviderIds]);
+  // Derive the effective active provider: clear selection when the provider
+  // is no longer in the visible set (avoids a setState-in-effect pattern).
+  const effectiveChartProviderId =
+    activeChartProviderId && chartProviderIds.includes(activeChartProviderId)
+      ? activeChartProviderId
+      : null;
 
   const overviewVerticalRows = Math.min(6, Math.max(1, overviewAccounts.length));
 
@@ -680,13 +682,13 @@ function DashboardPage({
                   }
                   className={cn(
                     "flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] transition-[opacity,border-color,background-color,color,transform]",
-                    activeChartProviderId === providerId
+                    effectiveChartProviderId === providerId
                       ? "border-primary/40 bg-primary/10 text-foreground shadow-sm"
-                      : activeChartProviderId && activeChartProviderId !== providerId
+                      : effectiveChartProviderId && effectiveChartProviderId !== providerId
                         ? "border-border/45 bg-background/55 text-muted-foreground opacity-55 hover:opacity-80"
                         : "border-border/55 bg-background/70 text-foreground hover:border-border/75"
                   )}
-                  aria-pressed={activeChartProviderId === providerId}
+                  aria-pressed={effectiveChartProviderId === providerId}
                 >
                   <div className="relative shrink-0">
                     <ProviderIcon providerId={providerId} size={14} />
@@ -714,7 +716,7 @@ function DashboardPage({
                 bars={monthlyBars}
                 emptyText={copy.common.noActivity}
                 valueLabel={copy.common.tokens}
-                activeProviderId={activeChartProviderId}
+                activeProviderId={effectiveChartProviderId}
                 layout={chartBarsLayout}
                 embedded
               />
@@ -725,7 +727,7 @@ function DashboardPage({
                 bars={monthlyRequestBars}
                 emptyText={copy.common.noActivity}
                 valueLabel={copy.common.requestCount}
-                activeProviderId={activeChartProviderId}
+                activeProviderId={effectiveChartProviderId}
                 layout={chartBarsLayout}
                 embedded
               />

@@ -308,11 +308,11 @@ impl CostUsagePricing {
         }
 
         // Remove version suffix like "-v1:0"
-        let version_pattern = regex_lite::Regex::new(r"-v\d+:\d+$").unwrap();
+        let version_pattern = regex_lite::Regex::new(r"-v\d+:\d+$").expect("valid regex");
         trimmed = version_pattern.replace(&trimmed, "").to_string();
 
         // Try without date suffix if base exists in pricing
-        let date_pattern = regex_lite::Regex::new(r"-\d{8}$").unwrap();
+        let date_pattern = regex_lite::Regex::new(r"-\d{8}$").expect("valid regex");
         if let Some(mat) = date_pattern.find(&trimmed) {
             let base = &trimmed[..mat.start()];
             if CLAUDE_PRICING.contains_key(base) {

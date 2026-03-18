@@ -54,7 +54,7 @@ pub fn run() {
 
             // Build tray icon
             TrayIconBuilder::with_id("main-tray")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(app.default_window_icon().ok_or("no default window icon")?.clone())
                 .tooltip("TokenFlow - Make Every Token Spend Traceable")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

@@ -163,7 +163,7 @@ export async function pollUntilAuthorized(
       );
     } catch (err) {
       if (err instanceof Error) throw err;
-      throw new Error(String(err));
+      throw new Error(String(err), { cause: err });
     }
   }
 

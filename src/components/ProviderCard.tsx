@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -108,13 +108,14 @@ export function ProviderCard({
     void openInBrowser(meta.portalUrl);
   };
 
-  useEffect(() => {
-    setDraftAlias(account.alias ?? "");
-  }, [account.alias]);
-
   const handleSaveAlias = () => {
     onRename?.(account.accountId, draftAlias.trim());
     setIsRenaming(false);
+  };
+
+  const handleStartRenaming = () => {
+    setDraftAlias(account.alias ?? "");
+    setIsRenaming(true);
   };
 
   return (
@@ -311,7 +312,7 @@ export function ProviderCard({
                         <p className="text-xs text-muted-foreground">{t("provider.accountLabel")}</p>
                         <p className="truncate text-sm font-medium">{accountLabel}</p>
                       </div>
-                      <Button variant="ghost" size="xs" onClick={() => setIsRenaming(true)}>
+                      <Button variant="ghost" size="xs" onClick={handleStartRenaming}>
                         <Pencil className="size-3" />
                         {t("provider.rename")}
                       </Button>

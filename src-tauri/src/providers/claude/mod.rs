@@ -510,7 +510,7 @@ fn extract_reset_description(text: &str, label: &str) -> Option<String> {
 fn clean_plan_name(text: &str) -> String {
     let cleaned = strip_ansi(text);
     // Remove bracketed codes like [22m
-    let re = Regex::new(r"\[\d+m").unwrap_or_else(|_| Regex::new(".^").unwrap());
+    let re = Regex::new(r"\[\d+m").unwrap_or_else(|_| Regex::new(r"(?!a)a").expect("valid regex"));
     let result = re.replace_all(&cleaned, "");
     result.trim().to_string()
 }

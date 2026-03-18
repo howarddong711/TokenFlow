@@ -2,6 +2,7 @@
   "name": "tokenflow",
   "private": false,
   "version": "0.1.0",
+  "license": "MIT",
   "description": "Windows desktop dashboard for AI coding accounts, token usage, and provider-native quota windows.",
   "author": "Howard Dong",
   "homepage": "https://github.com/howarddong711",
@@ -14,6 +15,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "lint": "eslint .",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -32,13 +34,18 @@
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.3.5",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^10.0.3",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
     "shadcn": "^4.0.7",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.57.1",
     "vite": "^7.0.4"
   }
 }
