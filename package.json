@@ -1,0 +1,44 @@
+{
+  "name": "tokenflow",
+  "private": false,
+  "version": "0.1.0",
+  "description": "Windows desktop dashboard for AI coding accounts, token usage, and provider-native quota windows.",
+  "author": "Howard Dong",
+  "homepage": "https://github.com/howarddong711",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/howarddong711/tokenflow.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-store": "^2.4.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "radix-ui": "^1.4.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^25.3.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "shadcn": "^4.0.7",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
