@@ -236,7 +236,7 @@ pub async fn get_copilot_user(access_token: String) -> Result<CopilotUserInfo, S
         .get(GITHUB_USER_URL)
         .header("Authorization", format!("Bearer {access_token}"))
         .header("Accept", "application/json")
-        .header("User-Agent", "TokenFlow/0.1.0")
+        .header("User-Agent", "TokenFlow/0.1.1")
         .send()
         .await
         .map_err(|e| format!("Failed to fetch user info: {e}"))?;
@@ -260,7 +260,7 @@ pub async fn get_copilot_status(access_token: String) -> Result<CopilotStatusRes
         .get(COPILOT_TOKEN_URL)
         .header("Authorization", format!("token {access_token}"))
         .header("Accept", "application/json")
-        .header("User-Agent", "TokenFlow/0.1.0")
+        .header("User-Agent", "TokenFlow/0.1.1")
         .send()
         .await
         .map_err(|e| format!("Failed to exchange Copilot token: {e}"))?;

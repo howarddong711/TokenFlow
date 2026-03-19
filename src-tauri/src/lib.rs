@@ -36,6 +36,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            app.manage(system::PendingAppUpdate::default());
+
             fn show_main_window(app: &tauri::AppHandle) {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.unminimize();
@@ -147,6 +151,8 @@ pub fn run() {
             system::clear_debug_log,
             system::get_debug_log_path,
             system::export_debug_log,
+            system::check_for_app_update,
+            system::install_pending_app_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

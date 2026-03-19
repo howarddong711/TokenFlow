@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TokenFlow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.howarddong711.tokenflow",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -27,6 +27,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -35,5 +36,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI2OEJFMDQ5MDNEMDEyRTkKUldUcEV0QURTZUNMSmtVSE9yem8wcmQzWStGVW5HOVlRTExlT3lWcjZQRndMcG0vQ0p1dGxGaWoK",
+      "endpoints": [
+        "https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

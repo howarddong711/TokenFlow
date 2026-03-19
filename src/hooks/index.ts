@@ -8,6 +8,8 @@ export { useMissionControl } from "./useMissionControl";
 export type { UseMissionControlReturn } from "./useMissionControl";
 export { useProviders } from "./useProviders";
 export type { DeviceFlowState, UseProvidersReturn } from "./useProviders";
+export { useAppUpdater } from "./useAppUpdater";
+export type { AppUpdateInfo, AppUpdaterState } from "./useAppUpdater";
 export { useWorkspacePreferences } from "./useWorkspacePreferences";
 export type { WorkspaceTheme } from "./useWorkspacePreferences";
 export { useLogCenter } from "./useLogCenter";

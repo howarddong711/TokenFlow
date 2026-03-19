@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Languages, MoonStar, Palette, PlayCircle, Shield, Sun } from "lucide-react";
+import { Download, Languages, MoonStar, Palette, PlayCircle, Shield, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,11 +25,13 @@ interface SettingsPageProps {
   privacyMode: boolean;
   minimizeToTray: boolean;
   launchOnStartup: boolean;
+  autoUpdate: boolean;
   providerColors: Record<ProviderId, string>;
   onThemeChange: (theme: WorkspaceTheme) => void;
   onPrivacyModeChange: (enabled: boolean) => void;
   onMinimizeToTrayChange: (enabled: boolean) => void;
   onLaunchOnStartupChange: (enabled: boolean) => void;
+  onAutoUpdateChange: (enabled: boolean) => void;
   onProviderColorChange: (providerId: ProviderId, color: string) => void;
   onResetProviderColors: () => void;
 }
@@ -44,11 +46,13 @@ export function SettingsPage({
   privacyMode,
   minimizeToTray,
   launchOnStartup,
+  autoUpdate,
   providerColors,
   onThemeChange,
   onPrivacyModeChange,
   onMinimizeToTrayChange,
   onLaunchOnStartupChange,
+  onAutoUpdateChange,
   onProviderColorChange,
   onResetProviderColors,
 }: SettingsPageProps) {
@@ -81,6 +85,13 @@ export function SettingsPage({
             value={minimizeToTray ? copy.settings.enabled : copy.settings.disabled}
             checked={minimizeToTray}
             onChange={onMinimizeToTrayChange}
+          />
+          <ToggleTile
+            icon={<Download className="size-4" />}
+            label={copy.settings.autoUpdate}
+            value={autoUpdate ? copy.settings.enabled : copy.settings.disabled}
+            checked={autoUpdate}
+            onChange={onAutoUpdateChange}
           />
         </CardContent>
       </Card>

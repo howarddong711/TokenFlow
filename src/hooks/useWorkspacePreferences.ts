@@ -11,6 +11,7 @@ export interface WorkspacePreferences {
   privacyMode: boolean;
   minimizeToTray: boolean;
   launchOnStartup: boolean;
+  autoUpdate: boolean;
   providerColors: Record<ProviderId, string>;
 }
 
@@ -40,6 +41,7 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   privacyMode: false,
   minimizeToTray: true,
   launchOnStartup: false,
+  autoUpdate: false,
   providerColors: DEFAULT_PROVIDER_COLORS,
 };
 
@@ -69,6 +71,10 @@ function readPreferences(): WorkspacePreferences {
         typeof parsed.launchOnStartup === "boolean"
           ? parsed.launchOnStartup
           : DEFAULT_PREFERENCES.launchOnStartup,
+      autoUpdate:
+        typeof parsed.autoUpdate === "boolean"
+          ? parsed.autoUpdate
+          : DEFAULT_PREFERENCES.autoUpdate,
       providerColors: upgradeLegacyProviderColors({
         ...DEFAULT_PROVIDER_COLORS,
         ...(parsed.providerColors ?? {}),
@@ -148,6 +154,11 @@ export function useWorkspacePreferences() {
         setPreferences((current) => ({
           ...current,
           launchOnStartup,
+        })),
+      setAutoUpdate: (autoUpdate: boolean) =>
+        setPreferences((current) => ({
+          ...current,
+          autoUpdate,
         })),
       setProviderColor: (providerId: ProviderId, color: string) =>
         setPreferences((current) => ({

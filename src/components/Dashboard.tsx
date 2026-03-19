@@ -20,7 +20,7 @@ import { QuotaRing } from "@/components/QuotaRing";
 import { SettingsPage } from "@/components/SettingsPage";
 import { Sidebar, type WorkspacePageId } from "@/components/Sidebar";
 import { UsageBars, type UsageBarsLayout } from "@/components/UsageBars";
-import { useAccounts, useLogCenter, useWorkspacePreferences } from "@/hooks";
+import { useAccounts, useAppUpdater, useLogCenter, useWorkspacePreferences } from "@/hooks";
 import type {
   RequestDataSource,
 } from "@/hooks/useLogCenter";
@@ -58,7 +58,7 @@ import { cn } from "@/lib/utils";
 import type { ProviderAccount, ProviderId } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.1.1";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,
@@ -119,6 +119,7 @@ export function Dashboard() {
     renameAccount,
   } = useAccounts();
   const { preferences, ...preferenceActions } = useWorkspacePreferences();
+  const appUpdater = useAppUpdater(preferences.autoUpdate);
   const logCenter = useLogCenter();
 
   const focusedAccounts = useMemo(() => getFocusedAccounts(accounts), [accounts]);
@@ -504,17 +505,27 @@ export function Dashboard() {
               privacyMode={preferences.privacyMode}
               minimizeToTray={preferences.minimizeToTray}
               launchOnStartup={preferences.launchOnStartup}
+              autoUpdate={preferences.autoUpdate}
               providerColors={preferences.providerColors}
               onThemeChange={preferenceActions.setTheme}
               onPrivacyModeChange={preferenceActions.setPrivacyMode}
               onMinimizeToTrayChange={preferenceActions.setMinimizeToTray}
               onLaunchOnStartupChange={preferenceActions.setLaunchOnStartup}
+              onAutoUpdateChange={preferenceActions.setAutoUpdate}
               onProviderColorChange={preferenceActions.setProviderColor}
               onResetProviderColors={preferenceActions.resetProviderColors}
             />
           ) : null}
 
-          {page === "about" ? <AboutPage version={APP_VERSION} /> : null}
+          {page === "about" ? (
+            <AboutPage
+              version={APP_VERSION}
+              autoUpdateEnabled={preferences.autoUpdate}
+              updateState={appUpdater.state}
+              onCheckUpdates={appUpdater.checkForUpdates}
+              onInstallUpdate={appUpdater.installUpdate}
+            />
+          ) : null}
         </div>
 
         <AddAccountDialog

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildMissionQueue,
   buildProviderHealthCards,
@@ -71,6 +71,7 @@ export function useMissionControl(args: {
       return {};
     }
   });
+  const autoRefreshInFlightRef = useRef<Set<string>>(new Set());
 
   const providerIds = useMemo(
     () => [...new Set(accounts.map((account) => account.providerId))] as ProviderId[],
@@ -137,6 +138,14 @@ export function useMissionControl(args: {
     automatic = false
   ) => {
     const now = new Date().toISOString();
+    if (automatic) {
+      if (autoRefreshInFlightRef.current.has(accountId)) {
+        return;
+      }
+      autoRefreshInFlightRef.current.add(accountId);
+      setAutoRefreshLedger((current) => ({ ...current, [accountId]: now }));
+    }
+
     try {
       await refreshAccount(accountId);
       const run: MissionRun = {
@@ -165,6 +174,10 @@ export function useMissionControl(args: {
         createdAt: now,
       };
       setRuns((current) => [...current, run].slice(-160));
+    } finally {
+      if (automatic) {
+        autoRefreshInFlightRef.current.delete(accountId);
+      }
     }
   }, [refreshAccount]);
 

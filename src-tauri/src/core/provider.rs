@@ -435,11 +435,13 @@ pub fn cli_name_map() -> HashMap<&'static str, ProviderId> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn test_provider_id_all() {
         let all = ProviderId::all();
-        assert_eq!(all.len(), 22);
+        let unique = all.iter().map(ProviderId::cli_name).collect::<HashSet<_>>();
+        assert_eq!(all.len(), unique.len());
         assert!(all.contains(&ProviderId::Claude));
         assert!(all.contains(&ProviderId::Codex));
         assert!(all.contains(&ProviderId::Kimi));

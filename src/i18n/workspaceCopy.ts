@@ -206,6 +206,7 @@ const ENGLISH = {
     minimizeToTray: "Closing the window hides TokenFlow to the tray",
     minimizeToTrayValue: "Always enabled",
     launchOnStartup: "Launch on system startup",
+    autoUpdate: "Automatically check and install updates",
     providerColors: "Provider colors",
     providerColorsHelp:
       "The three values on each row are RGB. These colors are used in dashboard charts and provider markers.",
@@ -228,7 +229,21 @@ const ENGLISH = {
     body:
       "The app focuses on Quotio-style mature provider onboarding while preserving each provider's real balance semantics instead of flattening everything into one fake quota model.",
     updates:
-      "Update checks and release packaging will live here so the about page becomes the trust center for the product.",
+      "Update checks and release packaging now flow through GitHub Releases so the about page can handle real desktop updates.",
+    updateStatusTitle: "App updates",
+    checkingUpdates: "Checking...",
+    updateIdle: "Check GitHub Releases to see whether a newer signed TokenFlow build is available.",
+    updateChecking: "Checking GitHub Releases for available updates.",
+    updateCurrent: "You're already on the latest available version.",
+    updateAvailable: (version: string, currentVersion: string) =>
+      `Version ${version} is available. Current version: ${currentVersion}.`,
+    updateInstalling: "Installing the update now. TokenFlow may close and relaunch automatically.",
+    updateInstalled: "The update package finished installing. If the app did not relaunch automatically, open TokenFlow again.",
+    updateError: (message: string) => `Update failed: ${message}`,
+    installUpdate: "Install update",
+    releaseNotes: "Release notes",
+    autoUpdateEnabled: "Automatic background updates are enabled in Settings.",
+    lastChecked: (value: string) => `Last checked: ${value}`,
   },
   providerNames: {} as Record<ProviderId, string>,
 };
@@ -422,6 +437,7 @@ const CHINESE = {
     minimizeToTray: "点击右上角关闭按钮时会隐藏到托盘",
     minimizeToTrayValue: "固定启用",
     launchOnStartup: "开机自动启动",
+    autoUpdate: "自动检查并安装更新",
     providerColors: "供应商颜色",
     providerColorsHelp: "每一行的三个数字分别是 RGB。这些颜色会用于 Dashboard 柱状图和供应商标记。",
     requestTracking: "请求追踪",
@@ -441,7 +457,21 @@ const CHINESE = {
     subtitle: "让每一次 Token 消耗都有迹可循",
     body:
       "产品重点是沿着 Quotio 那种成熟接入方式前进，同时保留每个平台真实的余额语义，而不是把一切压成一套假的统一额度模型。",
-    updates: "后续这里会承接更新检查和正式发布信息，让关于页变成产品的信任中心。",
+    updates: "更新检查和正式发布现在会通过 GitHub Releases 打通，让关于页可以真正处理桌面端更新。",
+    updateStatusTitle: "应用更新",
+    checkingUpdates: "检查中...",
+    updateIdle: "检查 GitHub Releases，看看是否有新的签名版本可安装。",
+    updateChecking: "正在检查 GitHub Releases 上的可用更新。",
+    updateCurrent: "当前已经是最新可用版本。",
+    updateAvailable: (version: string, currentVersion: string) =>
+      `发现可用版本 ${version}，当前版本为 ${currentVersion}。`,
+    updateInstalling: "正在安装更新。TokenFlow 可能会自动关闭并重新启动。",
+    updateInstalled: "更新包已经安装完成。如果应用没有自动重新打开，请手动启动 TokenFlow。",
+    updateError: (message: string) => `更新失败：${message}`,
+    installUpdate: "立即安装",
+    releaseNotes: "更新说明",
+    autoUpdateEnabled: "设置里已开启后台自动更新。",
+    lastChecked: (value: string) => `上次检查：${value}`,
   },
   providerNames: {} as Record<ProviderId, string>,
 };
