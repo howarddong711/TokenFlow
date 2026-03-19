@@ -13,3 +13,4 @@ export type { AppUpdateInfo, AppUpdaterState } from "./useAppUpdater";
 export { useWorkspacePreferences } from "./useWorkspacePreferences";
 export type { WorkspaceTheme } from "./useWorkspacePreferences";
 export { useLogCenter } from "./useLogCenter";
+export { useApiKeyVault } from "./useApiKeyVault";

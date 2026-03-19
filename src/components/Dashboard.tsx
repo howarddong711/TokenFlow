@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { AboutPage } from "@/components/AboutPage";
 import { AddAccountDialog } from "@/components/AddAccountDialog";
+import { ApiKeysPage } from "@/components/ApiKeysPage";
 import { ProviderColorBadge, ProviderIcon } from "@/components/ProviderIcon";
 import { QuotaRing } from "@/components/QuotaRing";
 import { SettingsPage } from "@/components/SettingsPage";
 import { Sidebar, type WorkspacePageId } from "@/components/Sidebar";
 import { UsageBars, type UsageBarsLayout } from "@/components/UsageBars";
-import { useAccounts, useAppUpdater, useLogCenter, useWorkspacePreferences } from "@/hooks";
+import { useAccounts, useApiKeyVault, useAppUpdater, useLogCenter, useWorkspacePreferences } from "@/hooks";
 import type {
   RequestDataSource,
 } from "@/hooks/useLogCenter";
@@ -119,6 +120,7 @@ export function Dashboard() {
     renameAccount,
   } = useAccounts();
   const { preferences, ...preferenceActions } = useWorkspacePreferences();
+  const apiKeyVault = useApiKeyVault();
   const appUpdater = useAppUpdater(preferences.autoUpdate);
   const logCenter = useLogCenter();
 
@@ -427,10 +429,14 @@ export function Dashboard() {
                 <RefreshCw className={cn("size-4", refreshingAll && "animate-spin")} />
               </Button>
             </header>
-          ) : page === "settings" || page === "about" ? (
+          ) : page === "settings" || page === "about" || page === "apiKeys" ? (
             <header className="flex items-center justify-between gap-4 px-1 py-1">
               <h1 className="text-3xl font-semibold tracking-tight">
-                {page === "settings" ? copy.settings.title : copy.about.title}
+                {page === "settings"
+                  ? copy.settings.title
+                  : page === "apiKeys"
+                    ? copy.apiKeys.title
+                    : copy.about.title}
               </h1>
             </header>
           ) : (
@@ -496,6 +502,16 @@ export function Dashboard() {
               copiedLogs={copiedLogs}
               isLoading={logCenter.isLoading}
               error={logCenter.error}
+            />
+          ) : null}
+
+          {page === "apiKeys" ? (
+            <ApiKeysPage
+              copy={copy}
+              entries={apiKeyVault.entries}
+              onSaveEntry={apiKeyVault.saveEntry}
+              onRemoveEntry={apiKeyVault.removeEntry}
+              onMarkCopied={apiKeyVault.markCopied}
             />
           ) : null}
 

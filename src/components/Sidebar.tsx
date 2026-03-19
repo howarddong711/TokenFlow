@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   FileClock,
   Info,
+  KeyRound,
   LayoutDashboard,
   PanelsTopLeft,
   Settings2,
@@ -11,7 +12,7 @@ import { getWorkspaceCopy } from "@/i18n/workspaceCopy";
 import { cn } from "@/lib/utils";
 import appLogo from "../../src-tauri/icons/128x128.png";
 
-export type WorkspacePageId = "dashboard" | "providers" | "logs" | "settings" | "about";
+export type WorkspacePageId = "dashboard" | "providers" | "apiKeys" | "logs" | "settings" | "about";
 
 interface SidebarProps {
   activePage: WorkspacePageId;
@@ -51,6 +52,12 @@ export function Sidebar({ activePage, onSelectPage }: SidebarProps) {
           icon={<PanelsTopLeft className="size-4" />}
           label={copy.nav.providers}
           onClick={() => onSelectPage("providers")}
+        />
+        <NavButton
+          active={activePage === "apiKeys"}
+          icon={<KeyRound className="size-4" />}
+          label={copy.nav.apiKeys}
+          onClick={() => onSelectPage("apiKeys")}
         />
         <NavButton
           active={activePage === "logs"}
