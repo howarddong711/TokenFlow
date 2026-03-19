@@ -9,7 +9,7 @@
 
 TokenFlow is a Windows desktop command center for AI coding accounts, local request visibility, and provider-native quota windows.
 
-It keeps multiple providers in one workspace without flattening them into a fake shared quota model. You can connect accounts, inspect quota windows, review local request activity, export logs, and ship signed desktop updates through GitHub Releases.
+It keeps multiple providers in one workspace without flattening them into a fake shared quota model. You can connect accounts, inspect quota windows, review local request activity, and export logs.
 
 ![TokenFlow Dashboard](./screenshots/dashboard.png)
 
@@ -115,32 +115,3 @@ TOKENFLOW_IFLOW_CLIENT_SECRET=
 | About |
 | --- |
 | ![About](./screenshots/about.png) |
-
-## Release Flow
-
-TokenFlow ships with a GitHub Releases based updater. A normal release flow is:
-
-1. Sync the version everywhere:
-
-```powershell
-.\release.bat 0.1.2
-```
-
-2. Verify the build:
-
-```powershell
-npm run build
-cargo test --manifest-path src-tauri\Cargo.toml
-```
-
-3. Commit, push, and tag:
-
-```powershell
-git add .
-git commit -m "Release v0.1.2"
-git push origin main
-git tag v0.1.2
-git push origin v0.1.2
-```
-
-The GitHub Actions release workflow builds the Windows installers, uploads signed artifacts, and publishes the updater metadata used by the in-app update flow.

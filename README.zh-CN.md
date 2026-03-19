@@ -9,7 +9,7 @@
 
 TokenFlow 是一个面向 Windows 的 AI 编码账号与额度管理桌面应用，用来统一查看多家服务商账号、本地请求活动和各平台原生 quota 窗口。
 
-它不会把所有服务商硬压成一个假的统一额度模型，而是尽量保留每个平台自己的额度语义。你可以在一个本地工作区里连接账号、查看配额窗口、检查请求日志、导出调试日志，并通过 GitHub Releases 获取签名更新。
+它不会把所有服务商硬压成一个假的统一额度模型，而是尽量保留每个平台自己的额度语义。你可以在一个本地工作区里连接账号、查看配额窗口、检查请求日志，并导出调试日志。
 
 ![TokenFlow Dashboard](./screenshots/dashboard.png)
 
@@ -115,32 +115,3 @@ TOKENFLOW_IFLOW_CLIENT_SECRET=
 | About |
 | --- |
 | ![About](./screenshots/about.png) |
-
-## 发版流程
-
-TokenFlow 现在已经接通了基于 GitHub Releases 的应用更新链路。日常发版流程可以按下面来：
-
-1. 先同步所有版本号：
-
-```powershell
-.\release.bat 0.1.2
-```
-
-2. 验证构建与测试：
-
-```powershell
-npm run build
-cargo test --manifest-path src-tauri\Cargo.toml
-```
-
-3. 提交、推送并打 tag：
-
-```powershell
-git add .
-git commit -m "Release v0.1.2"
-git push origin main
-git tag v0.1.2
-git push origin v0.1.2
-```
-
-GitHub Actions 的 release workflow 会自动构建 Windows 安装包、上传签名产物，并发布应用内更新所需的 updater 元数据。
