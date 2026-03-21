@@ -1,6 +1,6 @@
 [package]
 name = "tokenflow"
-version = "0.1.1"
+version = "0.1.2"
 description = "Windows desktop dashboard for AI coding accounts, token usage, and provider-native quota windows"
 authors = ["Howard Dong"]
 license = "MIT"

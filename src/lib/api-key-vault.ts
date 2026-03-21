@@ -1,3 +1,20 @@
+import deepseekIcon from "@/assets/provider-icons/api-keys/deepseek.ico";
+import openrouterIcon from "@/assets/provider-icons/api-keys/openrouter.ico";
+import siliconflowIcon from "@/assets/provider-icons/api-keys/siliconflow.ico";
+import xaiIcon from "@/assets/provider-icons/api-keys/xai.ico";
+import kimiIcon from "@/assets/provider-icons/api-keys/kimi.ico";
+import minimaxIcon from "@/assets/provider-icons/api-keys/minimax.ico";
+import hunyuanIcon from "@/assets/provider-icons/api-keys/hunyuan.ico";
+import baichuanIcon from "@/assets/provider-icons/api-keys/baichuan.png";
+import cohereIcon from "@/assets/provider-icons/api-keys/cohere.png";
+import mistralIcon from "@/assets/provider-icons/api-keys/mistral.png";
+import stepfunIcon from "@/assets/provider-icons/api-keys/stepfun.png";
+import togetherIcon from "@/assets/provider-icons/api-keys/together.png";
+import volcengineIcon from "@/assets/provider-icons/api-keys/volcengine.png";
+import fireworksIcon from "@/assets/provider-icons/api-keys/fireworks.svg";
+import groqIcon from "@/assets/provider-icons/api-keys/groq.svg";
+import perplexityIcon from "@/assets/provider-icons/api-keys/perplexity.svg";
+import zaiIcon from "@/assets/provider-icons/api-keys/zai.svg";
 import type { ProviderId } from "@/types";
 
 export type ApiKeyProviderId =
@@ -24,13 +41,20 @@ export type ApiKeyProviderId =
   | "baichuan";
 
 export interface ApiKeyVaultEntry {
+  id: string;
   provider: ApiKeyProviderId;
   label: string;
   apiKey: string;
   baseUrl: string;
+  models: string[];
   updatedAt: string;
   lastCopiedAt?: string;
 }
+
+export type ApiKeyVaultEntryInput = Pick<
+  ApiKeyVaultEntry,
+  "provider" | "label" | "apiKey" | "baseUrl" | "models"
+>;
 
 export interface ApiKeyProviderMeta {
   id: ApiKeyProviderId;
@@ -38,6 +62,7 @@ export interface ApiKeyProviderMeta {
   region: "global" | "china";
   color: string;
   iconProviderId?: ProviderId;
+  iconSrc?: string;
   monogram: string;
 }
 
@@ -71,7 +96,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "OpenRouter",
     region: "global",
     color: "#7C3AED",
-    iconProviderId: "openrouter",
+    iconSrc: openrouterIcon,
     monogram: "OR",
   },
   {
@@ -79,6 +104,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "DeepSeek",
     region: "global",
     color: "#2563EB",
+    iconSrc: deepseekIcon,
     monogram: "DS",
   },
   {
@@ -86,6 +112,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Groq",
     region: "global",
     color: "#0F172A",
+    iconSrc: groqIcon,
     monogram: "GQ",
   },
   {
@@ -93,6 +120,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Mistral",
     region: "global",
     color: "#F97316",
+    iconSrc: mistralIcon,
     monogram: "MS",
   },
   {
@@ -100,6 +128,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Together AI",
     region: "global",
     color: "#0EA5E9",
+    iconSrc: togetherIcon,
     monogram: "TG",
   },
   {
@@ -107,6 +136,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Fireworks AI",
     region: "global",
     color: "#EF4444",
+    iconSrc: fireworksIcon,
     monogram: "FW",
   },
   {
@@ -114,6 +144,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Cohere",
     region: "global",
     color: "#14B8A6",
+    iconSrc: cohereIcon,
     monogram: "CO",
   },
   {
@@ -121,6 +152,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "xAI",
     region: "global",
     color: "#111827",
+    iconSrc: xaiIcon,
     monogram: "xA",
   },
   {
@@ -128,6 +160,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Perplexity",
     region: "global",
     color: "#059669",
+    iconSrc: perplexityIcon,
     monogram: "PX",
   },
   {
@@ -135,6 +168,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "SiliconFlow",
     region: "china",
     color: "#2563EB",
+    iconSrc: siliconflowIcon,
     monogram: "SF",
   },
   {
@@ -142,6 +176,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Volcengine",
     region: "china",
     color: "#F97316",
+    iconSrc: volcengineIcon,
     monogram: "VE",
   },
   {
@@ -149,7 +184,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "z.ai",
     region: "china",
     color: "#EC4899",
-    iconProviderId: "zai",
+    iconSrc: zaiIcon,
     monogram: "ZA",
   },
   {
@@ -157,7 +192,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Kimi",
     region: "china",
     color: "#EF4444",
-    iconProviderId: "kimi",
+    iconSrc: kimiIcon,
     monogram: "KM",
   },
   {
@@ -173,7 +208,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "MiniMax",
     region: "china",
     color: "#F59E0B",
-    iconProviderId: "minimax",
+    iconSrc: minimaxIcon,
     monogram: "MM",
   },
   {
@@ -181,6 +216,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "StepFun",
     region: "china",
     color: "#06B6D4",
+    iconSrc: stepfunIcon,
     monogram: "ST",
   },
   {
@@ -188,6 +224,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Tencent Hunyuan",
     region: "china",
     color: "#0F766E",
+    iconSrc: hunyuanIcon,
     monogram: "HY",
   },
   {
@@ -195,6 +232,7 @@ export const API_KEY_PROVIDERS: ApiKeyProviderMeta[] = [
     name: "Baichuan",
     region: "china",
     color: "#DC2626",
+    iconSrc: baichuanIcon,
     monogram: "BC",
   },
 ];
@@ -203,10 +241,6 @@ export const API_KEY_PROVIDER_MAP = Object.fromEntries(
   API_KEY_PROVIDERS.map((provider) => [provider.id, provider])
 ) as Record<ApiKeyProviderId, ApiKeyProviderMeta>;
 
-export const GLOBAL_API_KEY_PROVIDERS = API_KEY_PROVIDERS.filter(
-  (provider) => provider.region === "global"
-);
-
-export const CHINA_API_KEY_PROVIDERS = API_KEY_PROVIDERS.filter(
-  (provider) => provider.region === "china"
+export const SORTED_API_KEY_PROVIDERS = [...API_KEY_PROVIDERS].sort((left, right) =>
+  left.name.localeCompare(right.name, "zh-Hans-CN", { sensitivity: "base" })
 );

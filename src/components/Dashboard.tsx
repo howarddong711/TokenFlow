@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
 import type { ProviderAccount, ProviderId } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.1";
+const APP_VERSION = "0.1.2";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,
@@ -509,7 +509,8 @@ export function Dashboard() {
             <ApiKeysPage
               copy={copy}
               entries={apiKeyVault.entries}
-              onSaveEntry={apiKeyVault.saveEntry}
+              onCreateEntry={apiKeyVault.createEntry}
+              onUpdateEntry={apiKeyVault.updateEntry}
               onRemoveEntry={apiKeyVault.removeEntry}
               onMarkCopied={apiKeyVault.markCopied}
             />

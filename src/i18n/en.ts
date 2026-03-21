@@ -13,7 +13,7 @@ const en = {
   "sidebar.providers": "Providers",
   "sidebar.tokenDashboard": "Token Dashboard",
   "sidebar.settings": "Settings",
-  "sidebar.version": "TokenFlow v0.1.1",
+  "sidebar.version": "TokenFlow v0.1.2",
   "provider.connected": "Connected",
   "provider.connecting": "Connecting...",
   "provider.error": "Error",
