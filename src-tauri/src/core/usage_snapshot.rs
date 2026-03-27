@@ -165,7 +165,10 @@ impl UsageSnapshot {
                 .model_specific
                 .as_ref()
                 .is_some_and(|w| w.is_exhausted())
-            || self.extra_windows.iter().any(|window| window.window.is_exhausted())
+            || self
+                .extra_windows
+                .iter()
+                .any(|window| window.window.is_exhausted())
     }
 }
 

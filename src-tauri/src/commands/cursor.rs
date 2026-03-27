@@ -83,7 +83,10 @@ async fn enrich_cookie_set(
     api: &CursorApi,
     cookie_set: BrowserCookieSet,
 ) -> CursorBrowserProfileCandidate {
-    match api.fetch_usage_with_cookie(Some(&cookie_set.cookie_header)).await {
+    match api
+        .fetch_usage_with_cookie(Some(&cookie_set.cookie_header))
+        .await
+    {
         Ok((_primary, _cost, email, plan)) => CursorBrowserProfileCandidate {
             browser_label: cookie_set.browser_label,
             email,

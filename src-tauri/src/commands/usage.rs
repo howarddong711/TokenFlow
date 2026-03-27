@@ -157,7 +157,10 @@ pub async fn extract_browser_cookie(domain: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn get_request_logs(_app: AppHandle, days: Option<u32>) -> Result<Vec<RequestLogEntry>, String> {
+pub async fn get_request_logs(
+    _app: AppHandle,
+    days: Option<u32>,
+) -> Result<Vec<RequestLogEntry>, String> {
     tracking::collect_request_logs(days.unwrap_or(30))
 }
 

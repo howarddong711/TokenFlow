@@ -99,7 +99,13 @@ mod tests {
 
         let source = &sources[0];
         assert_eq!(source.status, "ready");
-        assert!(source.provider_ids.iter().any(|provider| provider == "codex"));
-        assert!(source.provider_ids.iter().any(|provider| provider == "copilot"));
+        assert!(source
+            .provider_ids
+            .iter()
+            .any(|provider| provider == "codex"));
+        assert!(source
+            .provider_ids
+            .iter()
+            .any(|provider| provider == "copilot"));
     }
 }

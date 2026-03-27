@@ -67,7 +67,11 @@ impl Provider for QwenProvider {
                 .unwrap_or_else(|| "Qwen OAuth".to_string()),
         );
 
-        if let Some(label) = ctx.account_label.as_deref().filter(|value| !value.trim().is_empty()) {
+        if let Some(label) = ctx
+            .account_label
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
             usage = usage.with_organization(label.to_string());
         }
 

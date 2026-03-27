@@ -46,30 +46,22 @@ impl AccountAuthKind {
 #[serde(tag = "kind")]
 pub enum AccountSecret {
     #[serde(rename = "oauth", alias = "o_auth")]
-    OAuth {
-        credentials: OAuthCredentials,
-    },
+    OAuth { credentials: OAuthCredentials },
     #[serde(rename = "api_key")]
-    ApiKey {
-        value: String,
-    },
+    ApiKey { value: String },
     #[serde(rename = "service_account_json")]
     ServiceAccountJson {
         credentials: ServiceAccountCredentials,
     },
     #[serde(rename = "manual_cookie")]
-    ManualCookie {
-        cookie_header: String,
-    },
+    ManualCookie { cookie_header: String },
     #[serde(rename = "browser_profile_cookie")]
     BrowserProfileCookie {
         browser_label: String,
         cookie_header: String,
     },
     #[serde(rename = "imported_cli_oauth", alias = "imported_cli_o_auth")]
-    ImportedCliOAuth {
-        credentials: OAuthCredentials,
-    },
+    ImportedCliOAuth { credentials: OAuthCredentials },
 }
 
 impl AccountSecret {
@@ -267,10 +259,9 @@ impl ProviderId {
                 AccountAuthKind::ManualCookie,
             ],
             ProviderId::Kiro | ProviderId::Trae => LOCAL_ONLY_AUTH_KINDS,
-            ProviderId::Factory
-            | ProviderId::Kimi
-            | ProviderId::Ollama
-            | ProviderId::OpenCode => COOKIE_AUTH_KINDS,
+            ProviderId::Factory | ProviderId::Kimi | ProviderId::Ollama | ProviderId::OpenCode => {
+                COOKIE_AUTH_KINDS
+            }
             ProviderId::OpenRouter
             | ProviderId::Warp
             | ProviderId::Zai
@@ -287,10 +278,7 @@ impl ProviderId {
     pub fn prefers_native_oauth(&self) -> bool {
         matches!(
             self,
-            ProviderId::Codex
-                | ProviderId::Claude
-                | ProviderId::Iflow
-                | ProviderId::Antigravity
+            ProviderId::Codex | ProviderId::Claude | ProviderId::Iflow | ProviderId::Antigravity
         )
     }
 

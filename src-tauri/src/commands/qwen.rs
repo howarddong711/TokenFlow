@@ -190,7 +190,10 @@ fn qwen_credentials_paths() -> Result<Vec<(PathBuf, Option<std::time::SystemTime
                 return None;
             }
 
-            let modified = entry.metadata().ok().and_then(|metadata| metadata.modified().ok());
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok());
             Some((path, modified))
         })
         .collect::<Vec<_>>();

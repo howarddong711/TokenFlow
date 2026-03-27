@@ -184,6 +184,7 @@ const ENGLISH = {
     scope: "Scope",
     message: "Message",
     logPath: "Log file",
+    openFolder: "Open folder",
   },
   apiKeys: {
     title: "API Keys",
@@ -455,6 +456,7 @@ const CHINESE = {
     scope: "作用域",
     message: "内容",
     logPath: "日志文件",
+    openFolder: "打开目录",
   },
   apiKeys: {
     title: "API 密钥",

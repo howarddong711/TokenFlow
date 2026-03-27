@@ -84,7 +84,9 @@ pub async fn add_account(app: AppHandle, input: AddAccountInput) -> Result<Accou
     let label = build_account_label(provider_id, &input.label, &input.display);
     let has_secret = input.secret.is_some();
 
-    if let Some(existing) = find_existing_email_account(provider_id, &input.display, &existing_accounts) {
+    if let Some(existing) =
+        find_existing_email_account(provider_id, &input.display, &existing_accounts)
+    {
         append_debug_log(
             &app,
             "accounts.add_account",
@@ -101,7 +103,10 @@ pub async fn add_account(app: AppHandle, input: AddAccountInput) -> Result<Accou
         updated.display = merge_account_display(&existing.display, &input.display);
         updated.system_managed = provider_id.is_system_managed_only();
         if has_secret && updated.secret_ref.is_none() {
-            updated.secret_ref = Some(AccountSecretRef::for_account(updated.provider_id, updated.id));
+            updated.secret_ref = Some(AccountSecretRef::for_account(
+                updated.provider_id,
+                updated.id,
+            ));
         }
         if input.default {
             updated.default = true;
@@ -233,8 +238,9 @@ pub async fn repair_cursor_account_session(
     }
 
     let secret = repo.load_secret(&account).map_err(|err| err.to_string())?;
-    let refreshed_secret = refresh_cursor_cookie_secret(secret.as_ref())
-        .ok_or_else(|| "No matching browser profile cookie found. Please re-scan and import again.".to_string())?;
+    let refreshed_secret = refresh_cursor_cookie_secret(secret.as_ref()).ok_or_else(|| {
+        "No matching browser profile cookie found. Please re-scan and import again.".to_string()
+    })?;
 
     account.set_session_health(
         Some("stale"),
@@ -242,7 +248,10 @@ pub async fn repair_cursor_account_session(
         Some(chrono::Utc::now()),
     );
     if account.secret_ref.is_none() {
-        account.secret_ref = Some(AccountSecretRef::for_account(account.provider_id, account.id));
+        account.secret_ref = Some(AccountSecretRef::for_account(
+            account.provider_id,
+            account.id,
+        ));
     }
     let account = repo
         .save(&account, Some(&refreshed_secret))
@@ -258,7 +267,10 @@ pub async fn fetch_all_accounts_usage(app: AppHandle) -> Result<Vec<AccountUsage
     let repo_ref = &repo;
     let mut out = stream::iter(accounts.into_iter().enumerate())
         .map(|(index, account)| async move {
-            (index, fetch_account_usage_for_account(repo_ref, account, None).await)
+            (
+                index,
+                fetch_account_usage_for_account(repo_ref, account, None).await,
+            )
         })
         .buffer_unordered(4)
         .collect::<Vec<_>>()
@@ -319,9 +331,7 @@ async fn fetch_account_usage_for_account<R: tauri::Runtime>(
     };
 
     if secret.is_none() && account.auth_kind.requires_secret() {
-        if let Some(recovered) =
-            recover_provider_secret(repo, &account, "missing stored secret")
-        {
+        if let Some(recovered) = recover_provider_secret(repo, &account, "missing stored secret") {
             secret = Some(recovered);
         }
     }
@@ -339,6 +349,19 @@ async fn fetch_account_usage_for_account<R: tauri::Runtime>(
             ),
         );
         return AccountUsageResult::failure(account, message);
+    }
+
+    if let Some(secret) = secret.as_ref() {
+        append_debug_log(
+            repo.app_handle(),
+            "accounts.fetch_usage",
+            format!(
+                "Secret summary for account id={} provider={}: {}",
+                account.id,
+                account.provider_id.cli_name(),
+                summarize_secret_for_debug(secret)
+            ),
+        );
     }
 
     let mut fetch = fetch_with_secret(provider.as_ref(), &account, secret.as_ref()).await;
@@ -360,7 +383,10 @@ async fn fetch_account_usage_for_account<R: tauri::Runtime>(
                     Some(chrono::Utc::now()),
                 );
                 if account.secret_ref.is_none() {
-                    account.secret_ref = Some(AccountSecretRef::for_account(account.provider_id, account.id));
+                    account.secret_ref = Some(AccountSecretRef::for_account(
+                        account.provider_id,
+                        account.id,
+                    ));
                 }
                 secret = Some(refreshed_secret.clone());
                 match repo.save(&account, Some(&refreshed_secret)) {
@@ -386,6 +412,95 @@ async fn fetch_account_usage_for_account<R: tauri::Runtime>(
     let now = chrono::Utc::now();
     match fetch {
         Ok(fetch_result) => {
+            append_debug_log(
+                repo.app_handle(),
+                "accounts.fetch_usage",
+                format!(
+                    "Fetch succeeded for account id={} provider={} source={} primary={:.1}% secondary={} model_specific={} extra_windows={} login_method={}",
+                    account.id,
+                    account.provider_id.cli_name(),
+                    fetch_result.source_label,
+                    fetch_result.usage.primary.used_percent,
+                    fetch_result.usage.secondary.is_some(),
+                    fetch_result.usage.model_specific.is_some(),
+                    fetch_result.usage.extra_windows.len(),
+                    fetch_result
+                        .usage
+                        .login_method
+                        .as_deref()
+                        .unwrap_or("none")
+                ),
+            );
+            if account.provider_id == ProviderId::Antigravity
+                && !fetch_result.usage.extra_windows.is_empty()
+            {
+                append_debug_log(
+                    repo.app_handle(),
+                    "accounts.fetch_usage",
+                    format!(
+                        "Anti-Gravity extra windows for account id={}: {}",
+                        account.id,
+                        fetch_result
+                            .usage
+                            .extra_windows
+                            .iter()
+                            .map(|window| format!(
+                                "{} | {} | used={:.1}% | reset={}",
+                                window.id,
+                                window.label,
+                                window.window.used_percent,
+                                window
+                                    .window
+                                    .resets_at
+                                    .as_ref()
+                                    .map(|value| value.to_rfc3339())
+                                    .as_deref()
+                                    .unwrap_or("n/a")
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(" || ")
+                    ),
+                );
+            }
+            if account.provider_id == ProviderId::Trae {
+                let mut trae_windows = Vec::new();
+                trae_windows.push(format!(
+                    "primary | Primary quota | used={:.1}% | reset={}",
+                    fetch_result.usage.primary.used_percent,
+                    fetch_result
+                        .usage
+                        .primary
+                        .resets_at
+                        .as_ref()
+                        .map(|value| value.to_rfc3339())
+                        .as_deref()
+                        .unwrap_or("n/a")
+                ));
+                trae_windows.extend(fetch_result.usage.extra_windows.iter().map(|window| {
+                    format!(
+                        "{} | {} | used={:.1}% | reset={}",
+                        window.id,
+                        window.label,
+                        window.window.used_percent,
+                        window
+                            .window
+                            .resets_at
+                            .as_ref()
+                            .map(|value| value.to_rfc3339())
+                            .as_deref()
+                            .unwrap_or("n/a")
+                    )
+                }));
+                append_debug_log(
+                    repo.app_handle(),
+                    "accounts.fetch_usage",
+                    format!(
+                        "Trae quota windows for account id={}: {}",
+                        account.id,
+                        trae_windows.join(" || ")
+                    ),
+                );
+            }
             account.apply_usage(&fetch_result);
             if account.provider_id == ProviderId::Cursor {
                 account.set_session_health(Some("fresh"), None, Some(now));
@@ -409,6 +524,16 @@ async fn fetch_account_usage_for_account<R: tauri::Runtime>(
             AccountUsageResult::success(updated, fetch_result)
         }
         Err(err) => {
+            append_debug_log(
+                repo.app_handle(),
+                "accounts.fetch_usage",
+                format!(
+                    "Fetch failed for account id={} provider={} error={}",
+                    account.id,
+                    account.provider_id.cli_name(),
+                    err
+                ),
+            );
             if account.provider_id == ProviderId::Cursor {
                 let (health, reason) = classify_cursor_health(&err);
                 account.set_session_health(Some(health), Some(reason.clone()), Some(now));
@@ -552,7 +677,10 @@ async fn fetch_with_secret(
 }
 
 fn can_auto_repair_cursor(error: &ProviderError) -> bool {
-    matches!(error, ProviderError::AuthRequired | ProviderError::NoCookies)
+    matches!(
+        error,
+        ProviderError::AuthRequired | ProviderError::NoCookies
+    )
 }
 
 fn classify_cursor_health(error: &ProviderError) -> (&'static str, String) {
@@ -563,20 +691,17 @@ fn classify_cursor_health(error: &ProviderError) -> (&'static str, String) {
         ),
         ProviderError::NoCookies => (
             "invalid",
-            "No Cursor cookies available for this account. Please re-scan browser profiles.".to_string(),
+            "No Cursor cookies available for this account. Please re-scan browser profiles."
+                .to_string(),
         ),
         ProviderError::Timeout | ProviderError::Network(_) => (
             "stale",
             "Cursor session check timed out. You can retry or repair this account.".to_string(),
         ),
-        ProviderError::Other(message) => (
-            "stale",
-            format!("Cursor session check failed: {message}"),
-        ),
-        other => (
-            "stale",
-            format!("Cursor session check failed: {other}"),
-        ),
+        ProviderError::Other(message) => {
+            ("stale", format!("Cursor session check failed: {message}"))
+        }
+        other => ("stale", format!("Cursor session check failed: {other}")),
     }
 }
 
@@ -608,6 +733,47 @@ fn build_fetch_context(account: &AccountRecord, secret: Option<&AccountSecret>) 
     match secret {
         Some(secret) => secret.to_fetch_context(base),
         None => base,
+    }
+}
+
+fn summarize_secret_for_debug(secret: &AccountSecret) -> String {
+    match secret {
+        AccountSecret::OAuth { credentials } | AccountSecret::ImportedCliOAuth { credentials } => {
+            format!(
+                "oauth access_token_len={} refresh_token_present={} refresh_token_len={} expires_at={} scopes={}",
+                credentials.access_token.len(),
+                credentials
+                    .refresh_token
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty()),
+                credentials
+                    .refresh_token
+                    .as_deref()
+                    .map(|value| value.len())
+                    .unwrap_or(0),
+                credentials
+                    .expires_at
+                    .map(|value| value.to_rfc3339())
+                    .unwrap_or_else(|| "none".to_string()),
+                credentials.scopes.len()
+            )
+        }
+        AccountSecret::ApiKey { value } => format!("api_key len={}", value.len()),
+        AccountSecret::ServiceAccountJson { credentials } => format!(
+            "service_account project_id={} client_email={}",
+            credentials.project_id, credentials.client_email
+        ),
+        AccountSecret::ManualCookie { cookie_header } => {
+            format!("manual_cookie len={}", cookie_header.len())
+        }
+        AccountSecret::BrowserProfileCookie {
+            browser_label,
+            cookie_header,
+        } => format!(
+            "browser_profile_cookie browser={} len={}",
+            browser_label,
+            cookie_header.len()
+        ),
     }
 }
 
@@ -655,9 +821,15 @@ fn find_existing_email_account(
 
 fn merge_account_display(existing: &AccountDisplay, incoming: &AccountDisplay) -> AccountDisplay {
     AccountDisplay {
-        username: incoming.username.clone().or_else(|| existing.username.clone()),
+        username: incoming
+            .username
+            .clone()
+            .or_else(|| existing.username.clone()),
         email: incoming.email.clone().or_else(|| existing.email.clone()),
-        avatar_url: incoming.avatar_url.clone().or_else(|| existing.avatar_url.clone()),
+        avatar_url: incoming
+            .avatar_url
+            .clone()
+            .or_else(|| existing.avatar_url.clone()),
         plan: incoming.plan.clone().or_else(|| existing.plan.clone()),
         browser_label: incoming
             .browser_label
@@ -709,10 +881,9 @@ fn validate_add_account_input(
         (AccountAuthKind::OAuthToken, Some(AccountSecret::OAuth { .. })) => Ok(()),
         (AccountAuthKind::ImportedCliOAuth, Some(AccountSecret::ImportedCliOAuth { .. })) => Ok(()),
         (AccountAuthKind::ApiKey, Some(AccountSecret::ApiKey { .. })) => Ok(()),
-        (
-            AccountAuthKind::ServiceAccountJson,
-            Some(AccountSecret::ServiceAccountJson { .. }),
-        ) => Ok(()),
+        (AccountAuthKind::ServiceAccountJson, Some(AccountSecret::ServiceAccountJson { .. })) => {
+            Ok(())
+        }
         (AccountAuthKind::ManualCookie, Some(AccountSecret::ManualCookie { .. })) => Ok(()),
         (
             AccountAuthKind::BrowserProfileCookie,

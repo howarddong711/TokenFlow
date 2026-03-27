@@ -62,18 +62,18 @@ struct TraeEntitlementBaseInfo {
 
 #[derive(Debug, Deserialize)]
 struct TraeQuotaLimits {
-    advanced_model_request_limit: Option<u32>,
-    auto_completion_limit: Option<u32>,
-    premium_model_fast_request_limit: Option<u32>,
-    premium_model_slow_request_limit: Option<u32>,
+    advanced_model_request_limit: Option<i64>,
+    auto_completion_limit: Option<i64>,
+    premium_model_fast_request_limit: Option<i64>,
+    premium_model_slow_request_limit: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct TraeUsageAmounts {
-    advanced_model_amount: Option<u32>,
-    auto_completion_amount: Option<u32>,
-    premium_model_fast_amount: Option<u32>,
-    premium_model_slow_amount: Option<u32>,
+    advanced_model_amount: Option<i64>,
+    auto_completion_amount: Option<i64>,
+    premium_model_fast_amount: Option<i64>,
+    premium_model_slow_amount: Option<i64>,
 }
 
 pub struct TraeProvider {
@@ -119,7 +119,10 @@ impl TraeProvider {
         let response = self
             .client
             .post(endpoint)
-            .header(USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header(
+                USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .header(
                 AUTHORIZATION,
                 format!("Cloud-IDE-JWT {}", session.access_token),
@@ -176,27 +179,21 @@ impl Provider for TraeProvider {
             .or_else(|| response.user_entitlement_pack_list.first())
             .ok_or_else(|| ProviderError::Parse("No Trae entitlement data found".to_string()))?;
 
-        let base = entitlement
-            .entitlement_base_info
-            .as_ref()
-            .ok_or_else(|| ProviderError::Parse("Trae entitlement base info missing".to_string()))?;
+        let base = entitlement.entitlement_base_info.as_ref().ok_or_else(|| {
+            ProviderError::Parse("Trae entitlement base info missing".to_string())
+        })?;
         let quota = base
             .quota
             .as_ref()
             .ok_or_else(|| ProviderError::Parse("Trae quota payload missing".to_string()))?;
         let usage = entitlement.usage.as_ref();
         let resets_at = base.end_time.and_then(timestamp_to_datetime);
-
-        let primary = quota_window(
-            usage.and_then(|value| value.advanced_model_amount).unwrap_or(0),
-            quota.advanced_model_request_limit.unwrap_or(0),
-            resets_at,
-        )
-        .ok_or_else(|| ProviderError::Parse("Trae advanced model quota missing".to_string()))?;
+        let (primary, extra_windows) = build_trae_windows(usage, quota, resets_at)
+            .ok_or_else(|| ProviderError::Parse("Trae quota payload did not contain any usable windows".to_string()))?;
 
         let mut snapshot = UsageSnapshot::new(primary)
             .with_login_method(plan_label(base.product_type))
-            .with_extra_windows(build_extra_windows(usage, quota, resets_at));
+            .with_extra_windows(extra_windows);
 
         if let Some(email) = &session.email {
             snapshot = snapshot.with_email(email);
@@ -242,7 +239,10 @@ pub fn detect_local_session() -> Result<Option<TraeLocalSession>, ProviderError>
     };
 
     Ok(Some(TraeLocalSession {
-        email: auth.account.as_ref().and_then(|account| account.email.clone()),
+        email: auth
+            .account
+            .as_ref()
+            .and_then(|account| account.email.clone()),
         username: auth.account.and_then(|account| account.username),
         user_id: auth.user_id,
         access_token,
@@ -280,16 +280,40 @@ fn quota_window(used: u32, limit: u32, resets_at: Option<DateTime<Utc>>) -> Opti
     ))
 }
 
-fn build_extra_windows(
+fn normalize_trae_limit(value: Option<i64>) -> Option<u32> {
+    value
+        .filter(|value| *value > 0)
+        .and_then(|value| u32::try_from(value).ok())
+}
+
+fn normalize_trae_usage(value: Option<i64>) -> u32 {
+    value
+        .filter(|value| *value > 0)
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(0)
+}
+
+fn build_trae_windows(
     usage: Option<&TraeUsageAmounts>,
     quota: &TraeQuotaLimits,
     resets_at: Option<DateTime<Utc>>,
-) -> Vec<NamedRateWindow> {
+) -> Option<(RateWindow, Vec<NamedRateWindow>)> {
     let mut windows = Vec::new();
 
     if let Some(window) = quota_window(
-        usage.and_then(|value| value.auto_completion_amount).unwrap_or(0),
-        quota.auto_completion_limit.unwrap_or(0),
+        usage.map(|value| normalize_trae_usage(value.advanced_model_amount)).unwrap_or(0),
+        normalize_trae_limit(quota.advanced_model_request_limit).unwrap_or(0),
+        resets_at,
+    ) {
+        windows.push(
+            NamedRateWindow::new("advanced_model", "Advanced model usage", window)
+                .with_kind("usage"),
+        );
+    }
+
+    if let Some(window) = quota_window(
+        usage.map(|value| normalize_trae_usage(value.auto_completion_amount)).unwrap_or(0),
+        normalize_trae_limit(quota.auto_completion_limit).unwrap_or(0),
         resets_at,
     ) {
         windows.push(
@@ -299,8 +323,8 @@ fn build_extra_windows(
     }
 
     if let Some(window) = quota_window(
-        usage.and_then(|value| value.premium_model_fast_amount).unwrap_or(0),
-        quota.premium_model_fast_request_limit.unwrap_or(0),
+        usage.map(|value| normalize_trae_usage(value.premium_model_fast_amount)).unwrap_or(0),
+        normalize_trae_limit(quota.premium_model_fast_request_limit).unwrap_or(0),
         resets_at,
     ) {
         windows.push(
@@ -309,8 +333,8 @@ fn build_extra_windows(
     }
 
     if let Some(window) = quota_window(
-        usage.and_then(|value| value.premium_model_slow_amount).unwrap_or(0),
-        quota.premium_model_slow_request_limit.unwrap_or(0),
+        usage.map(|value| normalize_trae_usage(value.premium_model_slow_amount)).unwrap_or(0),
+        normalize_trae_limit(quota.premium_model_slow_request_limit).unwrap_or(0),
         resets_at,
     ) {
         windows.push(
@@ -318,7 +342,8 @@ fn build_extra_windows(
         );
     }
 
-    windows
+    let primary = windows.first().map(|window| window.window.clone())?;
+    Some((primary, windows))
 }
 
 fn plan_label(product_type: Option<i32>) -> String {

@@ -16,8 +16,7 @@ export function buildProviderUsageSnapshot(
   if (
     providerId === "iflow" ||
     providerId === "vertexai" ||
-    providerId === "qwen" ||
-    providerId === "antigravity"
+    providerId === "qwen"
   ) {
     return {
       windows: [],
@@ -207,7 +206,12 @@ function getWindowLabel(
       if (role === "secondary") return "7-day window";
       return "Model-specific window";
     case "gemini":
-      return role === "primary" ? "Current allowance" : role === "secondary" ? "Secondary allowance" : "Model allowance";
+    case "antigravity":
+      return role === "primary"
+        ? "Most constrained quota"
+        : role === "secondary"
+          ? "Secondary quota"
+          : "Model spotlight";
     default:
       if (role === "secondary") {
         return window.window_minutes && window.window_minutes >= 60 * 24 * 6

@@ -147,7 +147,8 @@ fn decode_url_component(input: &str) -> String {
 }
 
 fn iflow_client_id() -> Result<String, String> {
-    env::var("TOKENFLOW_IFLOW_CLIENT_ID").map_err(|_| "Missing TOKENFLOW_IFLOW_CLIENT_ID".to_string())
+    env::var("TOKENFLOW_IFLOW_CLIENT_ID")
+        .map_err(|_| "Missing TOKENFLOW_IFLOW_CLIENT_ID".to_string())
 }
 
 fn iflow_client_secret() -> Result<String, String> {
@@ -313,7 +314,10 @@ pub async fn iflow_exchange_token(code: String, port: u16) -> Result<IflowTokenR
         .post(TOKEN_ENDPOINT)
         .header(
             "Authorization",
-            format!("Basic {}", make_basic_auth_header(&client_id, &client_secret)),
+            format!(
+                "Basic {}",
+                make_basic_auth_header(&client_id, &client_secret)
+            ),
         )
         .form(&params)
         .send()
@@ -437,7 +441,10 @@ pub async fn iflow_refresh_token(
         .post(TOKEN_ENDPOINT)
         .header(
             "Authorization",
-            format!("Basic {}", make_basic_auth_header(&client_id, &client_secret)),
+            format!(
+                "Basic {}",
+                make_basic_auth_header(&client_id, &client_secret)
+            ),
         )
         .form(&params)
         .send()

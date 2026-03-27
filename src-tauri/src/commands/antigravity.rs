@@ -1,10 +1,19 @@
 use reqwest::Client;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::error::Error as _;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::AppHandle;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::time::timeout;
+
+use crate::core::append_debug_log;
 
 const CALLBACK_PORT: u16 = 51121;
 const AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -20,6 +29,12 @@ pub struct OAuthStartResponse {
     pub auth_url: String,
     pub state: String,
     pub port: u16,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OAuthAvailabilityResponse {
+    pub configured: bool,
+    pub missing: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -76,6 +91,8 @@ struct GoogleUserInfo {
 
 #[derive(Debug, Deserialize)]
 struct CodeAssistResponse {
+    #[serde(rename = "cloudaicompanionProject")]
+    project_id: Option<String>,
     #[serde(rename = "billingProjectNumber")]
     billing_project_number: Option<String>,
 }
@@ -84,6 +101,131 @@ struct CodeAssistResponse {
 struct GoogleRefreshResponse {
     access_token: String,
     expires_in: i64,
+}
+
+fn format_reqwest_error(err: &reqwest::Error) -> String {
+    let mut details = vec![err.to_string()];
+    let mut source = err.source();
+    while let Some(item) = source {
+        details.push(item.to_string());
+        source = item.source();
+    }
+    details.join(" | caused by: ")
+}
+
+fn build_http_client() -> Result<Client, String> {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .http1_only()
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))
+}
+
+#[cfg(windows)]
+fn run_powershell_json<T: DeserializeOwned>(
+    script: &str,
+    envs: &[(&str, &str)],
+) -> Result<T, String> {
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let mut cmd = Command::new("powershell.exe");
+    cmd.args(["-NoProfile", "-Command", script]);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    for (key, value) in envs {
+        cmd.env(key, value);
+    }
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run PowerShell fallback: {e}"))?;
+
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let detail = if !stderr.is_empty() {
+            stderr
+        } else if !stdout.is_empty() {
+            stdout
+        } else {
+            format!("PowerShell exited with status {}", output.status)
+        };
+        return Err(detail);
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    serde_json::from_str::<T>(&stdout)
+        .map_err(|e| format!("Failed to parse PowerShell fallback response: {e}; body={stdout}"))
+}
+
+#[cfg(windows)]
+fn exchange_token_via_powershell(
+    code: &str,
+    client_id: &str,
+    client_secret: &str,
+    redirect_uri: &str,
+) -> Result<GoogleTokenResponse, String> {
+    let script = r#"
+$ProgressPreference = 'SilentlyContinue'
+$body = @{
+  code = $env:TOKENFLOW_OAUTH_CODE
+  client_id = $env:TOKENFLOW_OAUTH_CLIENT_ID
+  client_secret = $env:TOKENFLOW_OAUTH_CLIENT_SECRET
+  redirect_uri = $env:TOKENFLOW_OAUTH_REDIRECT_URI
+  grant_type = 'authorization_code'
+}
+$resp = Invoke-RestMethod -Uri 'https://oauth2.googleapis.com/token' -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded'
+$resp | ConvertTo-Json -Compress
+"#;
+
+    run_powershell_json(
+        script,
+        &[
+            ("TOKENFLOW_OAUTH_CODE", code),
+            ("TOKENFLOW_OAUTH_CLIENT_ID", client_id),
+            ("TOKENFLOW_OAUTH_CLIENT_SECRET", client_secret),
+            ("TOKENFLOW_OAUTH_REDIRECT_URI", redirect_uri),
+        ],
+    )
+}
+
+#[cfg(windows)]
+fn get_user_info_via_powershell(access_token: &str) -> Result<GoogleUserInfo, String> {
+    let script = r#"
+$ProgressPreference = 'SilentlyContinue'
+$headers = @{ Authorization = "Bearer $env:TOKENFLOW_OAUTH_ACCESS_TOKEN" }
+$resp = Invoke-RestMethod -Uri 'https://www.googleapis.com/oauth2/v1/userinfo?alt=json' -Headers $headers -Method Get
+$resp | ConvertTo-Json -Compress
+"#;
+
+    run_powershell_json(script, &[("TOKENFLOW_OAUTH_ACCESS_TOKEN", access_token)])
+}
+
+#[cfg(windows)]
+fn refresh_token_via_powershell(
+    refresh_token: &str,
+    client_id: &str,
+    client_secret: &str,
+) -> Result<GoogleRefreshResponse, String> {
+    let script = r#"
+$ProgressPreference = 'SilentlyContinue'
+$body = @{
+  refresh_token = $env:TOKENFLOW_OAUTH_REFRESH_TOKEN
+  client_id = $env:TOKENFLOW_OAUTH_CLIENT_ID
+  client_secret = $env:TOKENFLOW_OAUTH_CLIENT_SECRET
+  grant_type = 'refresh_token'
+}
+$resp = Invoke-RestMethod -Uri 'https://oauth2.googleapis.com/token' -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded'
+$resp | ConvertTo-Json -Compress
+"#;
+
+    run_powershell_json(
+        script,
+        &[
+            ("TOKENFLOW_OAUTH_REFRESH_TOKEN", refresh_token),
+            ("TOKENFLOW_OAUTH_CLIENT_ID", client_id),
+            ("TOKENFLOW_OAUTH_CLIENT_SECRET", client_secret),
+        ],
+    )
 }
 
 fn generate_state() -> String {
@@ -150,16 +292,45 @@ fn extract_query_param(request_line: &str, param: &str) -> Option<String> {
 
 fn antigravity_client_id() -> Result<String, String> {
     env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
-        .map_err(|_| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string())
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string())
 }
 
 fn antigravity_client_secret() -> Result<String, String> {
     env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
-        .map_err(|_| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string())
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string())
 }
 
 #[tauri::command]
-pub async fn start_antigravity_oauth() -> Result<OAuthStartResponse, String> {
+pub fn get_antigravity_oauth_availability(app: AppHandle) -> OAuthAvailabilityResponse {
+    let mut missing = Vec::new();
+    if antigravity_client_id().is_err() {
+        missing.push("TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string());
+    }
+    if antigravity_client_secret().is_err() {
+        missing.push("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string());
+    }
+
+    let configured = missing.is_empty();
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!("availability configured={configured} missing={missing:?}"),
+    );
+
+    OAuthAvailabilityResponse {
+        configured,
+        missing,
+    }
+}
+
+#[tauri::command]
+pub async fn start_antigravity_oauth(app: AppHandle) -> Result<OAuthStartResponse, String> {
     let client_id = antigravity_client_id()?;
     let state = generate_state();
     let redirect_uri = format!("http://localhost:{CALLBACK_PORT}/oauth-callback");
@@ -177,13 +348,31 @@ pub async fn start_antigravity_oauth() -> Result<OAuthStartResponse, String> {
         state,
         port: CALLBACK_PORT,
     })
+    .inspect(|response| {
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!(
+                "start state_len={} callback_port={} redirect_uri={}",
+                response.state.len(),
+                response.port,
+                redirect_uri
+            ),
+        );
+    })
 }
 
 #[tauri::command]
 pub async fn antigravity_wait_for_callback(
+    app: AppHandle,
     state: String,
     port: u16,
 ) -> Result<CallbackResult, String> {
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!("waiting for callback state_len={} port={port}", state.len()),
+    );
     let listener = TcpListener::bind(("127.0.0.1", port))
         .await
         .map_err(|e| format!("Failed to bind callback listener: {e}"))?;
@@ -220,6 +409,15 @@ pub async fn antigravity_wait_for_callback(
 
             let incoming_state = extract_query_param(request_line, "state").unwrap_or_default();
             if incoming_state != state {
+                append_debug_log(
+                    &app,
+                    "antigravity.oauth",
+                    format!(
+                        "callback state mismatch incoming_len={} expected_len={}",
+                        incoming_state.len(),
+                        state.len()
+                    ),
+                );
                 let bad_request_response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nInvalid OAuth state.";
                 let _ = socket.write_all(bad_request_response.as_bytes()).await;
                 let _ = socket.shutdown().await;
@@ -228,11 +426,21 @@ pub async fn antigravity_wait_for_callback(
 
             let code = extract_query_param(request_line, "code").unwrap_or_default();
             if code.is_empty() {
+                append_debug_log(
+                    &app,
+                    "antigravity.oauth",
+                    "callback arrived without authorization code",
+                );
                 let bad_request_response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nMissing authorization code.";
                 let _ = socket.write_all(bad_request_response.as_bytes()).await;
                 let _ = socket.shutdown().await;
                 return Err("Missing authorization code in callback".to_string());
             }
+            append_debug_log(
+                &app,
+                "antigravity.oauth",
+                format!("callback received code_len={}", code.len()),
+            );
 
             let success_body = "<html><body><h2>Anti-Gravity authentication complete.</h2><p>You can close this window and return to TokenFlow.</p></body></html>";
             let success_response = format!(
@@ -255,13 +463,26 @@ pub async fn antigravity_wait_for_callback(
 }
 
 #[tauri::command]
-pub async fn antigravity_exchange_token(code: String, port: u16) -> Result<TokenResponse, String> {
-    let client = Client::new();
+pub async fn antigravity_exchange_token(
+    app: AppHandle,
+    code: String,
+    port: u16,
+) -> Result<TokenResponse, String> {
+    let client = build_http_client()?;
     let client_id = antigravity_client_id()?;
     let client_secret = antigravity_client_secret()?;
     let redirect_uri = format!("http://localhost:{port}/oauth-callback");
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!(
+            "exchange start code_len={} redirect_uri={redirect_uri} client_id_len={}",
+            code.len(),
+            client_id.len()
+        ),
+    );
 
-    let token_res = client
+    let token_res = match client
         .post(TOKEN_ENDPOINT)
         .form(&[
             ("code", code.as_str()),
@@ -272,13 +493,64 @@ pub async fn antigravity_exchange_token(code: String, port: u16) -> Result<Token
         ])
         .send()
         .await
-        .map_err(|e| format!("Failed to exchange OAuth code for token: {e}"))?;
+    {
+        Ok(response) => response,
+        Err(err) => {
+            #[cfg(windows)]
+            {
+                let fallback =
+                    exchange_token_via_powershell(&code, &client_id, &client_secret, &redirect_uri);
+                match fallback {
+                    Ok(token_data) => {
+                        append_debug_log(
+                            &app,
+                            "antigravity.oauth",
+                            format!(
+                                "exchange used PowerShell fallback access_len={} refresh_present={}",
+                                token_data.access_token.len(),
+                                token_data.refresh_token.as_ref().is_some_and(|value| !value.is_empty())
+                            ),
+                        );
+                        return Ok(TokenResponse {
+                            access_token: token_data.access_token,
+                            refresh_token: token_data.refresh_token.unwrap_or_default(),
+                            expires_in: token_data.expires_in,
+                        });
+                    }
+                    Err(fallback_err) => {
+                        return Err(format!(
+                            "Failed to exchange OAuth code for token: {} ; PowerShell fallback failed: {}",
+                            format_reqwest_error(&err),
+                            fallback_err
+                        ));
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                return Err(format!(
+                    "Failed to exchange OAuth code for token: {}",
+                    format_reqwest_error(&err)
+                ));
+            }
+        }
+    };
 
     if !token_res.status().is_success() {
         let status = token_res.status().as_u16();
         let body = token_res.text().await.unwrap_or_default();
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!("exchange http_status={status} body={body}"),
+        );
         return Err(format!("Google token endpoint returned {status}: {body}"));
     }
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!("exchange http_status={}", token_res.status()),
+    );
 
     let token_data = token_res
         .json::<GoogleTokenResponse>()
@@ -290,22 +562,80 @@ pub async fn antigravity_exchange_token(code: String, port: u16) -> Result<Token
         refresh_token: token_data.refresh_token.unwrap_or_default(),
         expires_in: token_data.expires_in,
     })
+    .inspect(|tokens| {
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!(
+                "exchange success access_len={} refresh_present={} expires_in={}",
+                tokens.access_token.len(),
+                !tokens.refresh_token.is_empty(),
+                tokens.expires_in
+            ),
+        );
+    })
 }
 
 #[tauri::command]
-pub async fn get_antigravity_user_info(access_token: String) -> Result<UserInfoResponse, String> {
-    let client = Client::new();
+pub async fn get_antigravity_user_info(
+    app: AppHandle,
+    access_token: String,
+) -> Result<UserInfoResponse, String> {
+    let client = build_http_client()?;
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!("user_info start access_len={}", access_token.len()),
+    );
 
-    let user_res = client
+    let user_res = match client
         .get(USER_INFO_ENDPOINT)
-        .bearer_auth(access_token)
+        .bearer_auth(&access_token)
         .send()
         .await
-        .map_err(|e| format!("Failed to fetch Google user info: {e}"))?;
+    {
+        Ok(response) => response,
+        Err(err) => {
+            #[cfg(windows)]
+            {
+                let user_info =
+                    get_user_info_via_powershell(&access_token).map_err(|fallback| {
+                        format!(
+                            "Failed to fetch Google user info: {} ; PowerShell fallback failed: {}",
+                            format_reqwest_error(&err),
+                            fallback
+                        )
+                    })?;
+
+                let email = user_info.email.ok_or_else(|| {
+                    "Google user info response did not include an email".to_string()
+                })?;
+                append_debug_log(
+                    &app,
+                    "antigravity.oauth",
+                    format!("user_info used PowerShell fallback email={email}"),
+                );
+
+                return Ok(UserInfoResponse { email });
+            }
+            #[cfg(not(windows))]
+            {
+                return Err(format!(
+                    "Failed to fetch Google user info: {}",
+                    format_reqwest_error(&err)
+                ));
+            }
+        }
+    };
 
     if !user_res.status().is_success() {
         let status = user_res.status().as_u16();
         let body = user_res.text().await.unwrap_or_default();
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!("user_info http_status={status} body={body}"),
+        );
         return Err(format!(
             "Google user info endpoint returned {status}: {body}"
         ));
@@ -319,16 +649,30 @@ pub async fn get_antigravity_user_info(access_token: String) -> Result<UserInfoR
     let email = user_info
         .email
         .ok_or_else(|| "Google user info response did not include an email".to_string())?;
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!("user_info success email={email}"),
+    );
 
     Ok(UserInfoResponse { email })
 }
 
 #[tauri::command]
 pub async fn get_antigravity_status(
+    app: AppHandle,
     access_token: String,
 ) -> Result<AntigravityStatusResponse, String> {
-    let client = Client::new();
+    let client = build_http_client()?;
     let endpoint = format!("{API_ENDPOINT}/{API_VERSION}:loadCodeAssist");
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!(
+            "status start access_len={} endpoint={endpoint}",
+            access_token.len()
+        ),
+    );
 
     let status_res = client
         .post(endpoint)
@@ -352,6 +696,11 @@ pub async fn get_antigravity_status(
     if !status_res.status().is_success() {
         let status = status_res.status().as_u16();
         let body = status_res.text().await.unwrap_or_default();
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!("status http_status={status} body={body}"),
+        );
         return Err(format!(
             "Anti-Gravity status endpoint returned {status}: {body}"
         ));
@@ -364,20 +713,45 @@ pub async fn get_antigravity_status(
 
     Ok(AntigravityStatusResponse {
         plan: "Anti-Gravity".to_string(),
-        project_id: status_data.billing_project_number,
+        project_id: status_data
+            .project_id
+            .or(status_data.billing_project_number),
         quotas: Vec::new(),
+    })
+    .inspect(|status| {
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!(
+                "status success project_present={}",
+                status
+                    .project_id
+                    .as_ref()
+                    .is_some_and(|value| !value.trim().is_empty())
+            ),
+        );
     })
 }
 
 #[tauri::command]
 pub async fn antigravity_refresh_token(
+    app: AppHandle,
     refresh_token: String,
 ) -> Result<RefreshTokenResponse, String> {
-    let client = Client::new();
+    let client = build_http_client()?;
     let client_id = antigravity_client_id()?;
     let client_secret = antigravity_client_secret()?;
+    append_debug_log(
+        &app,
+        "antigravity.oauth",
+        format!(
+            "refresh start refresh_len={} client_id_len={}",
+            refresh_token.len(),
+            client_id.len()
+        ),
+    );
 
-    let refresh_res = client
+    let refresh_res = match client
         .post(TOKEN_ENDPOINT)
         .form(&[
             ("refresh_token", refresh_token.as_str()),
@@ -387,11 +761,44 @@ pub async fn antigravity_refresh_token(
         ])
         .send()
         .await
-        .map_err(|e| format!("Failed to refresh OAuth token: {e}"))?;
+    {
+        Ok(response) => response,
+        Err(err) => {
+            #[cfg(windows)]
+            {
+                let refresh_data =
+                    refresh_token_via_powershell(&refresh_token, &client_id, &client_secret)
+                        .map_err(|fallback| {
+                            format!(
+                        "Failed to refresh OAuth token: {} ; PowerShell fallback failed: {}",
+                        format_reqwest_error(&err),
+                        fallback
+                    )
+                        })?;
+
+                return Ok(RefreshTokenResponse {
+                    access_token: refresh_data.access_token,
+                    expires_in: refresh_data.expires_in,
+                });
+            }
+            #[cfg(not(windows))]
+            {
+                return Err(format!(
+                    "Failed to refresh OAuth token: {}",
+                    format_reqwest_error(&err)
+                ));
+            }
+        }
+    };
 
     if !refresh_res.status().is_success() {
         let status = refresh_res.status().as_u16();
         let body = refresh_res.text().await.unwrap_or_default();
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!("refresh http_status={status} body={body}"),
+        );
         return Err(format!("Google refresh endpoint returned {status}: {body}"));
     }
 
@@ -403,5 +810,16 @@ pub async fn antigravity_refresh_token(
     Ok(RefreshTokenResponse {
         access_token: refresh_data.access_token,
         expires_in: refresh_data.expires_in,
+    })
+    .inspect(|tokens| {
+        append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!(
+                "refresh success access_len={} expires_in={}",
+                tokens.access_token.len(),
+                tokens.expires_in
+            ),
+        );
     })
 }

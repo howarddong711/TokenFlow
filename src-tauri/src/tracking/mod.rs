@@ -1,7 +1,7 @@
 mod gateway;
 mod local_logs;
-mod provider_reports;
 mod provider_reported_summary;
+mod provider_reports;
 mod status;
 mod types;
 

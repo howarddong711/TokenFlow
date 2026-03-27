@@ -52,7 +52,8 @@ impl VertexAIProvider {
         credentials: &ServiceAccountCredentials,
     ) -> Result<UsageSnapshot, ProviderError> {
         let access_token = self.exchange_service_account_token(credentials).await?;
-        self.fetch_project_snapshot(&access_token, credentials).await
+        self.fetch_project_snapshot(&access_token, credentials)
+            .await
     }
 
     async fn exchange_service_account_token(
@@ -71,8 +72,9 @@ impl VertexAIProvider {
         let assertion = encode(
             &Header::new(Algorithm::RS256),
             &claims,
-            &EncodingKey::from_rsa_pem(credentials.private_key.as_bytes())
-                .map_err(|err| ProviderError::Other(format!("Invalid Vertex private key: {err}")))?,
+            &EncodingKey::from_rsa_pem(credentials.private_key.as_bytes()).map_err(|err| {
+                ProviderError::Other(format!("Invalid Vertex private key: {err}"))
+            })?,
         )
         .map_err(|err| ProviderError::Other(format!("Failed to sign Vertex JWT: {err}")))?;
 
@@ -138,13 +140,13 @@ impl VertexAIProvider {
             .await
             .map_err(|err| ProviderError::Parse(err.to_string()))?;
 
-        let label = project.name.unwrap_or_else(|| credentials.project_id.clone());
-        Ok(
-            UsageSnapshot::new(RateWindow::new(0.0))
-                .with_login_method(format!("Vertex AI Project {}", label))
-                .with_email(credentials.client_email.clone())
-                .with_organization(credentials.project_id.clone()),
-        )
+        let label = project
+            .name
+            .unwrap_or_else(|| credentials.project_id.clone());
+        Ok(UsageSnapshot::new(RateWindow::new(0.0))
+            .with_login_method(format!("Vertex AI Project {}", label))
+            .with_email(credentials.client_email.clone())
+            .with_organization(credentials.project_id.clone()))
     }
 
     fn get_gcloud_config_path() -> Option<PathBuf> {
@@ -154,7 +156,10 @@ impl VertexAIProvider {
 
         #[cfg(target_os = "windows")]
         {
-            dirs::config_dir().map(|p| p.join("gcloud").join("application_default_credentials.json"))
+            dirs::config_dir().map(|p| {
+                p.join("gcloud")
+                    .join("application_default_credentials.json")
+            })
         }
         #[cfg(not(target_os = "windows"))]
         {
@@ -174,12 +179,17 @@ impl VertexAIProvider {
                 "C:\\Program Files (x86)\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gcloud.cmd",
             )),
             #[cfg(target_os = "windows")]
-            Some(PathBuf::from("C:\\Users\\Public\\google-cloud-sdk\\bin\\gcloud.cmd")),
+            Some(PathBuf::from(
+                "C:\\Users\\Public\\google-cloud-sdk\\bin\\gcloud.cmd",
+            )),
             #[cfg(not(target_os = "windows"))]
             None,
         ];
 
-        possible_paths.into_iter().flatten().find(|path| path.exists())
+        possible_paths
+            .into_iter()
+            .flatten()
+            .find(|path| path.exists())
     }
 
     async fn fetch_via_local_environment(&self) -> Result<UsageSnapshot, ProviderError> {

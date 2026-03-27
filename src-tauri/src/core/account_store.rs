@@ -1,5 +1,5 @@
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -67,8 +67,7 @@ impl<R: Runtime> AccountRepository<R> {
 
     pub fn list(&self) -> Result<Vec<AccountRecord>, AccountStoreError> {
         let store = self.get_store()?;
-        let accounts =
-            read_accounts_from_value(store.get(STORE_KEY).unwrap_or_else(|| json!([])))?;
+        let accounts = read_accounts_from_value(store.get(STORE_KEY).unwrap_or_else(|| json!([])))?;
         if !accounts.is_empty() {
             let (accounts, removed) = self.dedupe_accounts_by_email(accounts)?;
             if removed > 0 {
@@ -369,7 +368,11 @@ impl<R: Runtime> AccountRepository<R> {
             append_debug_log(
                 &self.app,
                 "account_store.restore_backup",
-                format!("Loaded backup {} with {} account(s)", path.display(), accounts.len()),
+                format!(
+                    "Loaded backup {} with {} account(s)",
+                    path.display(),
+                    accounts.len()
+                ),
             );
             return Ok(Some(accounts));
         }
@@ -382,17 +385,29 @@ impl<R: Runtime> AccountRepository<R> {
 
         for path in self.backup_paths() {
             if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|err| AccountStoreError::Store(format!("Failed to create backup dir {}: {err}", parent.display())))?;
+                fs::create_dir_all(parent).map_err(|err| {
+                    AccountStoreError::Store(format!(
+                        "Failed to create backup dir {}: {err}",
+                        parent.display()
+                    ))
+                })?;
             }
 
-            fs::write(&path, &serialized)
-                .map_err(|err| AccountStoreError::Store(format!("Failed to write backup {}: {err}", path.display())))?;
+            fs::write(&path, &serialized).map_err(|err| {
+                AccountStoreError::Store(format!(
+                    "Failed to write backup {}: {err}",
+                    path.display()
+                ))
+            })?;
 
             append_debug_log(
                 &self.app,
                 "account_store.write_backup",
-                format!("Wrote account backup {} with {} account(s)", path.display(), accounts.len()),
+                format!(
+                    "Wrote account backup {} with {} account(s)",
+                    path.display(),
+                    accounts.len()
+                ),
             );
         }
 
@@ -464,7 +479,9 @@ fn decode_secret(serialized: &str) -> Result<AccountSecret, AccountStoreError> {
             serde_json::from_str::<AccountSecret>(serialized)
                 .err()
                 .map(AccountStoreError::from)
-                .unwrap_or_else(|| AccountStoreError::Store("Failed to decode stored secret".to_string()))
+                .unwrap_or_else(|| {
+                    AccountStoreError::Store("Failed to decode stored secret".to_string())
+                })
         })
 }
 

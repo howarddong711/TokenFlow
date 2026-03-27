@@ -85,13 +85,16 @@ pub async fn collect_provider_reported_summary<R: Runtime>(
 
         for metric in result.metrics {
             let key = metric.id.clone();
-            let current = entry.metrics.entry(key).or_insert_with(|| ProviderReportedMetric {
-                id: metric.id.clone(),
-                label: metric.label.clone(),
-                value: 0.0,
-                limit: None,
-                unit: metric.unit.clone(),
-            });
+            let current = entry
+                .metrics
+                .entry(key)
+                .or_insert_with(|| ProviderReportedMetric {
+                    id: metric.id.clone(),
+                    label: metric.label.clone(),
+                    value: 0.0,
+                    limit: None,
+                    unit: metric.unit.clone(),
+                });
             current.value += metric.value;
             current.limit = match (current.limit, metric.limit) {
                 (Some(left), Some(right)) => Some(left + right),
@@ -204,12 +207,17 @@ async fn fetch_account_summary(
             fetch_cursor_summary(cookie_header).await.ok()
         }
         ProviderId::Claude => match secret {
-            AccountSecret::OAuth { credentials } | AccountSecret::ImportedCliOAuth { credentials } => {
-                fetch_claude_oauth_summary(credentials.access_token.clone()).await.ok()
+            AccountSecret::OAuth { credentials }
+            | AccountSecret::ImportedCliOAuth { credentials } => {
+                fetch_claude_oauth_summary(credentials.access_token.clone())
+                    .await
+                    .ok()
             }
             AccountSecret::ManualCookie { cookie_header }
             | AccountSecret::BrowserProfileCookie { cookie_header, .. } => {
-                fetch_claude_cookie_summary(cookie_header.clone()).await.ok()
+                fetch_claude_cookie_summary(cookie_header.clone())
+                    .await
+                    .ok()
             }
             _ => None,
         },
@@ -219,8 +227,9 @@ async fn fetch_account_summary(
 
 fn oauth_access_token(secret: &AccountSecret) -> Option<String> {
     match secret {
-        AccountSecret::OAuth { credentials }
-        | AccountSecret::ImportedCliOAuth { credentials } => Some(credentials.access_token.clone()),
+        AccountSecret::OAuth { credentials } | AccountSecret::ImportedCliOAuth { credentials } => {
+            Some(credentials.access_token.clone())
+        }
         _ => None,
     }
 }
@@ -240,7 +249,10 @@ fn cookie_header_value(secret: &AccountSecret) -> Option<String> {
     }
 }
 
-fn supports_provider_reported_summary(provider_id: ProviderId, auth_kind: &AccountAuthKind) -> bool {
+fn supports_provider_reported_summary(
+    provider_id: ProviderId,
+    auth_kind: &AccountAuthKind,
+) -> bool {
     match provider_id {
         ProviderId::Copilot => matches!(auth_kind, AccountAuthKind::OAuthToken),
         ProviderId::Amp
@@ -264,7 +276,13 @@ fn supports_provider_reported_summary(provider_id: ProviderId, auth_kind: &Accou
     }
 }
 
-fn metric(id: &str, label: &str, value: f64, limit: Option<f64>, unit: &str) -> ProviderReportedMetric {
+fn metric(
+    id: &str,
+    label: &str,
+    value: f64,
+    limit: Option<f64>,
+    unit: &str,
+) -> ProviderReportedMetric {
     ProviderReportedMetric {
         id: id.to_string(),
         label: label.to_string(),
@@ -395,7 +413,10 @@ async fn fetch_warp_summary(api_key: String) -> Result<AccountReportedSummary, S
         .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("Warp summary endpoint returned {}", response.status()));
+        return Err(format!(
+            "Warp summary endpoint returned {}",
+            response.status()
+        ));
     }
 
     let payload = response
@@ -428,7 +449,12 @@ async fn fetch_warp_summary(api_key: String) -> Result<AccountReportedSummary, S
         .workspaces
         .unwrap_or_default()
         .into_iter()
-        .flat_map(|workspace| workspace.bonus_grants_info.and_then(|info| info.grants).unwrap_or_default())
+        .flat_map(|workspace| {
+            workspace
+                .bonus_grants_info
+                .and_then(|info| info.grants)
+                .unwrap_or_default()
+        })
         .map(|grant| {
             grant.request_credits_granted.unwrap_or(0)
                 - grant.request_credits_remaining.unwrap_or(0)
@@ -457,7 +483,10 @@ async fn fetch_amp_summary(api_key: String) -> Result<AccountReportedSummary, St
         .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("Amp summary endpoint returned {}", response.status()));
+        return Err(format!(
+            "Amp summary endpoint returned {}",
+            response.status()
+        ));
     }
 
     let payload = response
@@ -497,7 +526,10 @@ async fn fetch_zai_summary(api_key: String) -> Result<AccountReportedSummary, St
         .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("z.ai summary endpoint returned {}", response.status()));
+        return Err(format!(
+            "z.ai summary endpoint returned {}",
+            response.status()
+        ));
     }
 
     let payload = response
@@ -530,7 +562,10 @@ async fn fetch_augment_summary(api_key: String) -> Result<AccountReportedSummary
         .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("Augment summary endpoint returned {}", response.status()));
+        return Err(format!(
+            "Augment summary endpoint returned {}",
+            response.status()
+        ));
     }
 
     let payload = response
@@ -549,7 +584,13 @@ async fn fetch_augment_summary(api_key: String) -> Result<AccountReportedSummary
         .and_then(|value| value.as_f64());
 
     Ok(AccountReportedSummary {
-        metrics: vec![metric("credits_used", "Credits used", used, limit, "credits")],
+        metrics: vec![metric(
+            "credits_used",
+            "Credits used",
+            used,
+            limit,
+            "credits",
+        )],
         ..AccountReportedSummary::default()
     })
 }
@@ -610,7 +651,10 @@ async fn fetch_kimik2_summary(api_key: String) -> Result<AccountReportedSummary,
         .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("Kimi K2 summary endpoint returned {}", response.status()));
+        return Err(format!(
+            "Kimi K2 summary endpoint returned {}",
+            response.status()
+        ));
     }
 
     let payload = response
@@ -640,7 +684,11 @@ async fn fetch_kimik2_summary(api_key: String) -> Result<AccountReportedSummary,
             "credits_used",
             "Credits used",
             used_balance,
-            if total_balance > 0.0 { Some(total_balance) } else { None },
+            if total_balance > 0.0 {
+                Some(total_balance)
+            } else {
+                None
+            },
             "credits",
         )],
         ..AccountReportedSummary::default()
@@ -670,7 +718,9 @@ async fn fetch_cursor_summary(cookie_header: String) -> Result<AccountReportedSu
     })
 }
 
-async fn fetch_claude_oauth_summary(access_token: String) -> Result<AccountReportedSummary, String> {
+async fn fetch_claude_oauth_summary(
+    access_token: String,
+) -> Result<AccountReportedSummary, String> {
     #[derive(Debug, Deserialize)]
     struct ClaudeUsageResponse {
         #[serde(rename = "extraUsage")]
@@ -698,7 +748,10 @@ async fn fetch_claude_oauth_summary(access_token: String) -> Result<AccountRepor
         .map_err(|err| err.to_string())?;
 
     if !response.status().is_success() {
-        return Err(format!("Claude OAuth summary endpoint returned {}", response.status()));
+        return Err(format!(
+            "Claude OAuth summary endpoint returned {}",
+            response.status()
+        ));
     }
 
     let payload = response
@@ -723,7 +776,9 @@ async fn fetch_claude_oauth_summary(access_token: String) -> Result<AccountRepor
     })
 }
 
-async fn fetch_claude_cookie_summary(cookie_header: String) -> Result<AccountReportedSummary, String> {
+async fn fetch_claude_cookie_summary(
+    cookie_header: String,
+) -> Result<AccountReportedSummary, String> {
     #[derive(Debug, Deserialize)]
     struct Organization {
         uuid: String,

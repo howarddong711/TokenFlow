@@ -168,7 +168,15 @@ function preserveRecentAccountState(
   result: AccountUsageResultDto
 ): ProviderAccount {
   const next = usageResultToAccount(result);
-  if (!previous || result.ok || !isWithinSyncGrace(previous.lastFetchedAt)) {
+  const previousHadQuotaData =
+    (previous?.usage?.windows.length ?? 0) > 0 || (previous?.quotas.length ?? 0) > 0;
+
+  if (
+    !previous ||
+    result.ok ||
+    !isWithinSyncGrace(previous.lastFetchedAt) ||
+    !previousHadQuotaData
+  ) {
     return next;
   }
 

@@ -58,7 +58,11 @@ pub fn run() {
 
             // Build tray icon
             TrayIconBuilder::with_id("main-tray")
-                .icon(app.default_window_icon().ok_or("no default window icon")?.clone())
+                .icon(
+                    app.default_window_icon()
+                        .ok_or("no default window icon")?
+                        .clone(),
+                )
                 .tooltip("TokenFlow - Make Every Token Spend Traceable")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
@@ -126,6 +130,7 @@ pub fn run() {
             qwen::import_qwen_cli_oauth,
             qwen::import_qwen_cli_oauth_from_path,
             antigravity::start_antigravity_oauth,
+            antigravity::get_antigravity_oauth_availability,
             antigravity::antigravity_wait_for_callback,
             antigravity::antigravity_exchange_token,
             antigravity::get_antigravity_user_info,

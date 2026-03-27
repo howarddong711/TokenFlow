@@ -66,15 +66,18 @@ impl Provider for GeminiProvider {
         };
 
         match fetch_result {
-            Ok((primary, model_specific, email)) => {
-                let mut usage = UsageSnapshot::new(primary);
-                if let Some(ms) = model_specific {
-                    usage = usage.with_model_specific(ms);
+            Ok(snapshot) => {
+                let mut usage =
+                    UsageSnapshot::new(snapshot.primary).with_extra_windows(snapshot.extra_windows);
+                if let Some(model_specific) = snapshot.model_specific {
+                    usage = usage.with_model_specific(model_specific);
                 }
-                if let Some(e) = email {
-                    usage = usage.with_email(e);
+                if let Some(email) = snapshot.email {
+                    usage = usage.with_email(email);
                 }
-                usage = usage.with_login_method("Gemini CLI");
+                if let Some(login_method) = snapshot.login_method {
+                    usage = usage.with_login_method(login_method);
+                }
 
                 Ok(ProviderFetchResult::new(usage, "cli"))
             }

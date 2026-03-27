@@ -2,7 +2,8 @@ import { type ReactNode, useCallback, useDeferredValue, useEffect, useMemo, useS
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save } from "@tauri-apps/plugin-dialog";
-import { ArrowUpDown, CheckCircle2, Columns2, Copy, Eye, EyeOff, FileClock, Layers3, PencilLine, Plus, RefreshCw, Rows3, Trash2, Users } from "lucide-react";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { ArrowUpDown, CheckCircle2, Columns2, Copy, Eye, EyeOff, FileClock, FolderOpen, Layers3, PencilLine, Plus, RefreshCw, Rows3, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -56,10 +57,10 @@ import {
   type RiskLevel,
 } from "@/lib/monitoring";
 import { cn } from "@/lib/utils";
-import type { ProviderAccount, ProviderId } from "@/types";
+import type { ProviderAccount, ProviderId, ProviderUsageWindow, TokenQuota } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.2";
+const APP_VERSION = "0.1.3";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,
@@ -257,7 +258,7 @@ export function Dashboard() {
     () =>
       providerTabIds.map((providerId) => {
         const providerAccounts = sortAccountsByLoginOrder(
-          connectedAccounts.filter((account) => account.providerId === providerId)
+          focusedAccounts.filter((account) => account.providerId === providerId)
         );
         const providerLogs = logCenter.requestLogs.filter((entry) => entry.providerId === providerId);
         const providerReported = logCenter.providerReportedSummary.byProvider.find(
@@ -280,7 +281,7 @@ export function Dashboard() {
           hasActivity: providerLogs.length > 0 || (providerReported?.totalRequests ?? 0) > 0,
         };
       }),
-    [connectedAccounts, logCenter.providerReportedSummary.byProvider, logCenter.requestLogs, providerTabIds]
+    [focusedAccounts, logCenter.providerReportedSummary.byProvider, logCenter.requestLogs, providerTabIds]
   );
   const filterProviderIds = useMemo(() => {
     const ids = new Set<ProviderId>();
@@ -817,6 +818,16 @@ function DashboardPage({
           >
             {overviewAccounts.map(({ account, providerId }) => {
               const windows = getAccountUsageWindows(account);
+              const antigravityModelWindows = getAntigravityModelWindows(windows);
+              const overviewWindows =
+                providerId === "antigravity" && antigravityModelWindows.length > 0
+                  ? buildAntigravityOverviewWindows(antigravityModelWindows)
+                  : providerId === "trae"
+                    ? buildTraeOverviewWindows(windows)
+                  : windows.slice(0, 2).map((window) => ({
+                      window,
+                      sideLabel: formatOverviewWindowLabel(window.label),
+                    }));
               const compactAccountLabel = overviewHideIdentity
                 ? getDisplayAccountName(account, true)
                 : account.email ||
@@ -841,8 +852,8 @@ function DashboardPage({
                     <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
                       <p className="truncate text-sm font-medium">{compactAccountLabel}</p>
                       <div className="flex shrink-0 items-center gap-2">
-                        {windows.length > 0 ? (
-                          windows.slice(0, 2).map((window) => (
+                        {overviewWindows.length > 0 ? (
+                          overviewWindows.map(({ window, sideLabel }) => (
                             <QuotaRing
                               key={window.id}
                               window={window}
@@ -850,7 +861,7 @@ function DashboardPage({
                               compact
                               tiny
                               hideMeta
-                              sideLabel={formatOverviewWindowLabel(window.label)}
+                              sideLabel={sideLabel}
                             />
                           ))
                         ) : (
@@ -1360,7 +1371,28 @@ function LogsPage({
             <CardContent className="space-y-4">
               {appLogPath ? (
                 <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground">{copy.logs.logPath}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium text-foreground">{copy.logs.logPath}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const directory = getParentDirectoryPath(appLogPath);
+                        try {
+                          if (directory) {
+                            await openPath(directory);
+                          } else {
+                            await revealItemInDir(appLogPath);
+                          }
+                        } catch {
+                          await revealItemInDir(appLogPath);
+                        }
+                      }}
+                    >
+                      <FolderOpen className="size-4" />
+                      {copy.logs.openFolder ?? "Open folder"}
+                    </Button>
+                  </div>
                   <p className="mt-1 break-all font-mono text-[11px] leading-5">{appLogPath}</p>
                 </div>
               ) : null}
@@ -1461,7 +1493,35 @@ function ProviderAccountPanel({
 }) {
   const windows = getAccountUsageWindows(account);
   const headlineWindow = getHeadlineUsageWindow(account);
-  const displayWindows = sortOverviewWindows(windows).slice(0, 2);
+  const antigravityModelWindows = useMemo(
+    () => getAntigravityModelWindows(windows),
+    [windows]
+  );
+  const antigravityOverviewWindows = useMemo(
+    () => buildAntigravityOverviewWindows(antigravityModelWindows),
+    [antigravityModelWindows]
+  );
+  const traeOverviewWindows = useMemo(
+    () => buildTraeOverviewWindows(windows),
+    [windows]
+  );
+  const displayWindowEntries = useMemo(
+    () =>
+      account.providerId === "antigravity" && antigravityOverviewWindows.length > 0
+        ? antigravityOverviewWindows
+        : account.providerId === "trae"
+          ? traeOverviewWindows
+        : sortOverviewWindows(windows).slice(0, 2).map((window) => ({
+            window,
+            sideLabel: formatOverviewWindowLabel(window.label),
+          })),
+    [account.providerId, antigravityOverviewWindows, traeOverviewWindows, windows]
+  );
+  const antigravityQuotaGroups = useMemo(
+    () => groupAntigravityModelWindows(antigravityModelWindows),
+    [antigravityModelWindows]
+  );
+  const [showQuotaDetails, setShowQuotaDetails] = useState(false);
   const risk = getAccountRiskLevel(account);
   const displayName = getDisplayAccountName(account, privacyMode);
   const planBadge = formatOverviewPlanBadge(account, account.providerId);
@@ -1494,9 +1554,9 @@ function ProviderAccountPanel({
             </div>
           </div>
           <div className="grid shrink-0 grid-cols-[auto_auto_minmax(72px,auto)_auto_auto] items-center" style={{ columnGap: `${layout.ringGap}px` }}>
-            {displayWindows.length > 0 ? (
+            {displayWindowEntries.length > 0 ? (
               <>
-                {displayWindows.map((window) => (
+                {displayWindowEntries.map(({ window, sideLabel }) => (
                   <QuotaRing
                     key={window.id}
                     window={window}
@@ -1504,7 +1564,7 @@ function ProviderAccountPanel({
                     compact
                     tiny
                     hideMeta
-                    sideLabel={formatOverviewWindowLabel(window.label)}
+                    sideLabel={sideLabel}
                     sizeOverride={layout.ringSize}
                     sideLabelSize={layout.sideLabelSize}
                   />
@@ -1522,6 +1582,17 @@ function ProviderAccountPanel({
               {formatRiskLabel(copy, risk)}
             </span>
             <div className="ml-1 flex items-center gap-1">
+              {account.providerId === "antigravity" && antigravityModelWindows.length > 0 ? (
+                <Button
+                  variant="outline"
+                  size="icon-xs"
+                  onClick={() => setShowQuotaDetails(true)}
+                  aria-label="View all model quotas"
+                  title="View all model quotas"
+                >
+                  <Eye className="size-3.5" />
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 size="icon-xs"
@@ -1544,6 +1615,49 @@ function ProviderAccountPanel({
           </div>
         </div>
       </CardContent>
+      {account.providerId === "antigravity" && antigravityModelWindows.length > 0 ? (
+        <Dialog open={showQuotaDetails} onOpenChange={setShowQuotaDetails}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Anti-Gravity model quotas</DialogTitle>
+              <DialogDescription>
+                {displayName} · {planBadge}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+              {antigravityQuotaGroups.map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {group.title}
+                    </p>
+                    <span className="text-xs text-muted-foreground">{group.windows.length}</span>
+                  </div>
+                  {group.windows.map((window) => {
+                    const remaining = getWindowRemainingPercent(window);
+                    const reset = window.quota.resetsAt ? formatResetTime(window.quota.resetsAt) : "No reset time";
+                    return (
+                      <div
+                        key={window.id}
+                        className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{window.label}</p>
+                          <p className="text-xs text-muted-foreground">{reset}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-foreground">{formatPercent(remaining)} remaining</p>
+                          <p className="text-xs text-muted-foreground">{formatPercent(window.quota.used)} used</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </Card>
   );
 }
@@ -1691,6 +1805,264 @@ function formatOverviewWindowLabel(label: string) {
   }
 
   return label.length > 10 ? `${label.slice(0, 10)}...` : label;
+}
+
+function getParentDirectoryPath(path: string): string {
+  const normalized = path.trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const lastSeparator = Math.max(normalized.lastIndexOf("\\"), normalized.lastIndexOf("/"));
+  if (lastSeparator <= 0) {
+    return "";
+  }
+
+  return normalized.slice(0, lastSeparator);
+}
+
+function getAntigravityModelWindows(windows: ProviderUsageWindow[]): ProviderUsageWindow[] {
+  const extraModelWindows = windows.filter((window) => window.role === "custom" && window.kind === "model");
+  if (extraModelWindows.length > 0) {
+    return mergeAntigravityModelWindows(extraModelWindows);
+  }
+  return mergeAntigravityModelWindows(windows.filter((window) => window.kind === "model"));
+}
+
+function buildAntigravityOverviewWindows(
+  windows: ProviderUsageWindow[]
+): Array<{ window: ProviderUsageWindow; sideLabel: string }> {
+  if (windows.length === 0) {
+    return [];
+  }
+
+  const sorted = sortAntigravityModelWindows(windows);
+  const leastWindow = sorted[0];
+  const averageRemaining =
+    sorted.reduce((sum, window) => sum + getWindowRemainingPercent(window), 0) / sorted.length;
+
+  return [
+    {
+      window: leastWindow,
+      sideLabel: "min",
+    },
+    {
+      window: createSyntheticQuotaWindow(
+        "antigravity:average",
+        "Average quota",
+        averageRemaining,
+        leastWindow.quota.resetsAt
+      ),
+      sideLabel: "avg",
+    },
+  ];
+}
+
+function buildTraeOverviewWindows(
+  windows: ProviderUsageWindow[]
+): Array<{ window: ProviderUsageWindow; sideLabel: string }> {
+  const sorted = sortOverviewWindows(dedupeTraeOverviewWindows(windows));
+  if (sorted.length <= 1) {
+    return sorted.map((window) => ({
+      window,
+      sideLabel: formatOverviewWindowLabel(window.label),
+    }));
+  }
+
+  return sorted.slice(0, 2).map((window) => ({
+    window,
+    sideLabel: formatOverviewWindowLabel(window.label),
+  }));
+}
+
+function dedupeTraeOverviewWindows(windows: ProviderUsageWindow[]): ProviderUsageWindow[] {
+  if (windows.length <= 1) {
+    return windows;
+  }
+
+  const primaryWindows = windows.filter((window) => window.role === "primary");
+  const nonPrimaryWindows = windows.filter((window) => window.role !== "primary");
+
+  if (primaryWindows.length !== 1 || nonPrimaryWindows.length === 0) {
+    return windows;
+  }
+
+  const primary = primaryWindows[0];
+  const hasEquivalentDetailedWindow = nonPrimaryWindows.some(
+    (window) =>
+      window.quota.used === primary.quota.used &&
+      (window.quota.remainingPercent ?? null) === (primary.quota.remainingPercent ?? null) &&
+      (window.quota.resetsAt ?? null) === (primary.quota.resetsAt ?? null)
+  );
+
+  return hasEquivalentDetailedWindow ? nonPrimaryWindows : windows;
+}
+
+function groupAntigravityModelWindows(
+  windows: ProviderUsageWindow[]
+): Array<{ key: string; title: string; windows: ProviderUsageWindow[] }> {
+  const shortCycle: ProviderUsageWindow[] = [];
+  const longCycle: ProviderUsageWindow[] = [];
+  const noReset: ProviderUsageWindow[] = [];
+  const shortCycleThresholdMs = 72 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  for (const window of sortAntigravityModelWindows(windows)) {
+    const resetAt = window.quota.resetsAt ? Date.parse(window.quota.resetsAt) : Number.NaN;
+
+    if (Number.isNaN(resetAt)) {
+      noReset.push(window);
+      continue;
+    }
+
+    if (resetAt - now <= shortCycleThresholdMs) {
+      shortCycle.push(window);
+      continue;
+    }
+
+    longCycle.push(window);
+  }
+
+  return [
+    { key: "short-cycle", title: "Short-cycle windows", windows: shortCycle },
+    { key: "long-cycle", title: "Long-cycle windows", windows: longCycle },
+    { key: "no-reset", title: "No reset time", windows: noReset },
+  ].filter((group) => group.windows.length > 0);
+}
+
+function sortAntigravityModelWindows(windows: ProviderUsageWindow[]): ProviderUsageWindow[] {
+  return [...windows].sort((left, right) => {
+    const remainingDelta = getWindowRemainingPercent(left) - getWindowRemainingPercent(right);
+    if (remainingDelta !== 0) {
+      return remainingDelta;
+    }
+    return left.label.localeCompare(right.label);
+  });
+}
+
+function mergeAntigravityModelWindows(windows: ProviderUsageWindow[]): ProviderUsageWindow[] {
+  const merged = new Map<string, ProviderUsageWindow>();
+
+  for (const window of windows) {
+    const normalized = normalizeAntigravityWindow(window);
+    const existing = merged.get(normalized.key);
+    if (!existing) {
+      merged.set(normalized.key, {
+        ...window,
+        id: normalized.id,
+        name: normalized.label,
+        label: normalized.label,
+      });
+      continue;
+    }
+
+    const existingRemaining = getWindowRemainingPercent(existing);
+    const incomingRemaining = getWindowRemainingPercent(window);
+    const useIncoming = incomingRemaining < existingRemaining;
+    const resetsAt = pickEarlierReset(existing.quota.resetsAt, window.quota.resetsAt);
+
+    merged.set(normalized.key, {
+      ...(useIncoming ? window : existing),
+      id: normalized.id,
+      name: normalized.label,
+      label: normalized.label,
+      quota: {
+        ...(useIncoming ? window.quota : existing.quota),
+        resetsAt,
+      },
+    });
+  }
+
+  return [...merged.values()];
+}
+
+function normalizeAntigravityWindow(window: ProviderUsageWindow): {
+  key: string;
+  id: string;
+  label: string;
+} {
+  const rawId = window.id.toLowerCase();
+  const rawLabel = window.label.trim();
+
+  if (rawId.includes("chat_") || /^chat\s+\d+$/i.test(rawLabel)) {
+    return {
+      key: "chat",
+      id: "antigravity:model:chat",
+      label: "Chat",
+    };
+  }
+
+  if (rawId.includes("tab_flash_lite_preview") || rawId.includes("tab_jump_flash_lite_preview")) {
+    return {
+      key: "tab-preview",
+      id: "antigravity:model:tab-preview",
+      label: "Tab Preview",
+    };
+  }
+
+  if (rawId.includes("gemini-3-flash-agent") || rawId.includes("gemini-3-flash")) {
+    return {
+      key: "gemini-3-flash",
+      id: "antigravity:model:gemini-3-flash",
+      label: "Gemini 3 Flash",
+    };
+  }
+
+  return {
+    key: rawLabel.toLowerCase(),
+    id: window.id,
+    label: rawLabel,
+  };
+}
+
+function pickEarlierReset(left?: string, right?: string): string | undefined {
+  if (!left) return right;
+  if (!right) return left;
+
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  if (Number.isNaN(leftTime)) return right;
+  if (Number.isNaN(rightTime)) return left;
+  return leftTime <= rightTime ? left : right;
+}
+
+function getWindowRemainingPercent(window: ProviderUsageWindow): number {
+  const remaining = window.quota.remainingPercent ?? (window.quota.total > 0 ? 100 - window.quota.used : 0);
+  return Math.max(0, Math.min(100, remaining));
+}
+
+function createSyntheticQuotaWindow(
+  id: string,
+  label: string,
+  remainingPercent: number,
+  resetsAt?: string
+): ProviderUsageWindow {
+  const normalizedRemaining = Math.max(0, Math.min(100, remainingPercent));
+  const quota: TokenQuota = {
+    used: Math.max(0, 100 - normalizedRemaining),
+    total: 100,
+    unlimited: false,
+    unit: "%",
+    displayMode: "progress",
+    valueLabel: `${formatPercent(normalizedRemaining)} remaining`,
+    resetsAt,
+    remaining: normalizedRemaining,
+    remainingPercent: normalizedRemaining,
+  };
+
+  return {
+    id,
+    name: label,
+    label,
+    role: "custom",
+    quota,
+    kind: "model",
+    official: true,
+  };
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value)}%`;
 }
 
 function sortOverviewWindows(windows: ReturnType<typeof getAccountUsageWindows>) {

@@ -10,8 +10,12 @@ pub fn debug_log_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String>
         .path()
         .app_data_dir()
         .map_err(|err| format!("Failed to resolve app data dir: {err}"))?;
-    fs::create_dir_all(&base_dir)
-        .map_err(|err| format!("Failed to create app data dir {}: {err}", base_dir.display()))?;
+    fs::create_dir_all(&base_dir).map_err(|err| {
+        format!(
+            "Failed to create app data dir {}: {err}",
+            base_dir.display()
+        )
+    })?;
     Ok(base_dir.join("tokenflow-debug.log"))
 }
 
@@ -38,12 +42,15 @@ pub fn read_debug_log<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> 
     match fs::read_to_string(&path) {
         Ok(content) => Ok(content),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
-        Err(err) => Err(format!("Failed to read debug log {}: {err}", path.display())),
+        Err(err) => Err(format!(
+            "Failed to read debug log {}: {err}",
+            path.display()
+        )),
     }
 }
 
 pub fn clear_debug_log<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let path = debug_log_path(app)?;
-    fs::write(&path, "").map_err(|err| format!("Failed to clear debug log {}: {err}", path.display()))
+    fs::write(&path, "")
+        .map_err(|err| format!("Failed to clear debug log {}: {err}", path.display()))
 }
-

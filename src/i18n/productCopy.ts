@@ -373,7 +373,7 @@ const ENGLISH_COPY = {
       gemini: {
         title: "Import the account you already signed into Gemini CLI",
         summary:
-          "Fastest path: import existing Gemini CLI OAuth. Manual token paste is still available as a fallback.",
+          "Import the Gemini CLI OAuth credentials already stored on this machine and sync live model quota windows from Google.",
         primaryTitle: "Import Gemini CLI credentials",
         primarySummary: "Use the account already signed into Gemini CLI on this machine.",
         primaryAction: "Import from Gemini CLI",
@@ -464,6 +464,15 @@ const ENGLISH_COPY = {
         title: "Attach to the Trae session already signed into this machine",
         summary:
           "Quotio-style Trae support is monitor-only. TokenFlow reads the local Trae desktop session and preserves provider-native quota windows.",
+        browserLoginTitle: "Open Trae sign-in",
+        browserLoginSummary:
+          "Open the official Trae sign-in page first. After you finish signing in, TokenFlow will watch the local Trae session and auto-import it.",
+        browserLoginAction: "Login with Trae",
+        browserLoginPreparing: "Preparing Trae sign-in...",
+        browserLoginWaiting:
+          "Complete Trae sign-in in the browser or desktop app. TokenFlow will auto-import the first new local Trae session it detects.",
+        browserLoginTimeout:
+          "No new Trae session was detected in time. If Trae is already signed in on this machine, use the local session import below.",
         primaryTitle: "Import local Trae desktop session",
         primarySummary:
           "Use the Trae environment already signed in on this machine. TokenFlow will read the local session and fetch official Trae entitlement windows.",
@@ -912,7 +921,7 @@ const CHINESE_COPY = {
       },
       gemini: {
         title: "导入你已经登录过 Gemini CLI 的账号",
-        summary: "最快的方式是直接导入现有 Gemini CLI OAuth，也保留了手动粘贴令牌作为兜底。",
+        summary: "直接导入这台机器上已有的 Gemini CLI OAuth 凭据，并同步 Google 侧真实模型额度窗口。",
         primaryTitle: "导入 Gemini CLI 凭据",
         primarySummary: "使用这台机器上已经登录过 Gemini CLI 的账号。",
         primaryAction: "从 Gemini CLI 导入",
@@ -990,6 +999,15 @@ const CHINESE_COPY = {
         title: "挂接这台机器上已经登录的 Trae 会话",
         summary:
           "更接近 Quotio 的 Trae 支持方式是纯监控模式。TokenFlow 会读取本地 Trae 桌面会话，并保留平台原生额度窗口。",
+        browserLoginTitle: "打开 Trae 登录",
+        browserLoginSummary:
+          "先打开官方 Trae 登录页。完成登录后，TokenFlow 会监听本地 Trae 会话并自动导入。",
+        browserLoginAction: "使用 Trae 登录",
+        browserLoginPreparing: "正在准备 Trae 登录...",
+        browserLoginWaiting:
+          "请在浏览器或 Trae 桌面端完成登录，TokenFlow 会在检测到新的本地 Trae 会话后自动导入。",
+        browserLoginTimeout:
+          "在限定时间内没有检测到新的 Trae 会话。如果这台机器上已经登录了 Trae，可以直接使用下面的本地会话导入。",
         primaryTitle: "导入本地 Trae 桌面会话",
         primarySummary:
           "使用这台机器上已经登录的 Trae 环境。TokenFlow 会读取本地会话并抓取官方 Trae entitlement 窗口。",

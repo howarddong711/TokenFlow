@@ -103,10 +103,7 @@ pub async fn import_gemini_cli_oauth() -> Result<GeminiCliOAuthImportResponse, S
         .ok_or_else(|| "Gemini CLI credentials do not contain an access token".to_string())?;
 
     let expires_at = file.expiry_date.and_then(expiry_millis_to_datetime);
-    let email = file
-        .id_token
-        .as_deref()
-        .and_then(extract_email_from_jwt);
+    let email = file.id_token.as_deref().and_then(extract_email_from_jwt);
 
     Ok(GeminiCliOAuthImportResponse {
         credentials: OAuthCredentials {
@@ -124,7 +121,9 @@ fn gemini_cli_credentials_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or_else(|| "Could not locate home directory".to_string())?;
     let path = home.join(".gemini").join("oauth_creds.json");
     if !path.exists() {
-        return Err("Gemini CLI credentials not found. Run `gemini` to authenticate first.".to_string());
+        return Err(
+            "Gemini CLI credentials not found. Run `gemini` to authenticate first.".to_string(),
+        );
     }
     Ok(path)
 }

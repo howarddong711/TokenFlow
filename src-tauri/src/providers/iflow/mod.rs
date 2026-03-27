@@ -42,7 +42,10 @@ impl IflowProvider {
         }
     }
 
-    async fn fetch_user_info(&self, access_token: &str) -> Result<IflowUserInfoData, ProviderError> {
+    async fn fetch_user_info(
+        &self,
+        access_token: &str,
+    ) -> Result<IflowUserInfoData, ProviderError> {
         let response = self
             .client
             .get(USER_INFO_ENDPOINT)
@@ -73,9 +76,9 @@ impl IflowProvider {
             ));
         }
 
-        payload
-            .data
-            .ok_or_else(|| ProviderError::Parse("iFlow user info response missing data".to_string()))
+        payload.data.ok_or_else(|| {
+            ProviderError::Parse("iFlow user info response missing data".to_string())
+        })
     }
 
     async fn refresh_access_token(
@@ -85,7 +88,10 @@ impl IflowProvider {
         let response = self
             .client
             .post(TOKEN_ENDPOINT)
-            .header("Authorization", format!("Basic {}", make_basic_auth_header()))
+            .header(
+                "Authorization",
+                format!("Basic {}", make_basic_auth_header()),
+            )
             .form(&[
                 ("grant_type", "refresh_token"),
                 ("refresh_token", refresh_token),

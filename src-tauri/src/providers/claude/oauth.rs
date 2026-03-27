@@ -150,7 +150,9 @@ impl ClaudeOAuthFetcher {
         }
 
         let content = std::fs::read(&path).map_err(|e| {
-            ProviderError::OAuth(format!("Failed to read Claude credentials for fingerprint: {e}"))
+            ProviderError::OAuth(format!(
+                "Failed to read Claude credentials for fingerprint: {e}"
+            ))
         })?;
         let digest = Sha256::digest(content);
         Ok(Some(format!("{digest:x}")))

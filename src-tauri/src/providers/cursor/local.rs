@@ -57,16 +57,23 @@ pub fn build_local_fetch_result(session: &CursorLocalSession) -> ProviderFetchRe
 
 fn local_state_db_path() -> Option<PathBuf> {
     let base = dirs::data_dir()?;
-    Some(base.join("Cursor").join("User").join("globalStorage").join("state.vscdb"))
+    Some(
+        base.join("Cursor")
+            .join("User")
+            .join("globalStorage")
+            .join("state.vscdb"),
+    )
 }
 
 fn get_value(conn: &Connection, key: &str) -> Result<Option<String>, rusqlite::Error> {
-    conn.query_row("SELECT value FROM ItemTable WHERE key = ?1", [key], |row| row.get(0))
-        .map(Some)
-        .or_else(|err| match err {
-            rusqlite::Error::QueryReturnedNoRows => Ok(None),
-            other => Err(other),
-        })
+    conn.query_row("SELECT value FROM ItemTable WHERE key = ?1", [key], |row| {
+        row.get(0)
+    })
+    .map(Some)
+    .or_else(|err| match err {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other),
+    })
 }
 
 fn map_membership_plan(value: &str) -> Option<String> {

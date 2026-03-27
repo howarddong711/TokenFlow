@@ -196,6 +196,11 @@ interface AntigravityOAuthStartResponse {
   port: number;
 }
 
+interface AntigravityOAuthAvailabilityResponse {
+  configured: boolean;
+  missing: string[];
+}
+
 interface AntigravityCallbackResult {
   code: string;
 }
@@ -309,7 +314,7 @@ const CONNECTION_PRESETS: Record<ProviderId, ConnectionPreset> = {
     defaultAuthKind: "imported_cli_oauth",
     title: "Import the account you already signed into Gemini CLI",
     summary:
-      "Fastest path: import existing Gemini CLI OAuth. Manual token paste is still available as a fallback.",
+      "Import the Gemini CLI OAuth credentials already stored on this machine and sync live model quota windows from Google.",
     mode: "oauth",
   },
   iflow: {
@@ -817,6 +822,29 @@ export function AddAccountDialog({
     });
   };
 
+  const createTraeAccount = async (detected: TraeLocalSessionImport) => {
+    if (!providerId) {
+      throw new Error(copy.providerFallback);
+    }
+
+    return onAddAccount({
+      providerId,
+      label:
+        label.trim() ||
+        detected.email ||
+        detected.username ||
+        `${providerName} Desktop`,
+      authKind: "local_detected",
+      display: {
+        email: detected.email,
+        username: detected.username,
+        plan: detected.plan,
+        browser_label: "Trae/Desktop",
+      },
+      default: setAsDefault,
+    });
+  };
+
   const importCursorLocalSession = async () => {
     if (!providerId) return;
     setLoading(true);
@@ -854,22 +882,7 @@ export function AddAccountDialog({
     setError(null);
     try {
       const detected = await invoke<TraeLocalSessionImport>("import_trae_local_session");
-      const created = await onAddAccount({
-        providerId,
-        label:
-          label.trim() ||
-          detected.email ||
-          detected.username ||
-          `${providerName} Desktop`,
-        authKind: "local_detected",
-        display: {
-          email: detected.email,
-          username: detected.username,
-          plan: detected.plan,
-          browser_label: "Trae/Desktop",
-        },
-        default: setAsDefault,
-      });
+      const created = await createTraeAccount(detected);
 
       setOAuthDialogOpen(true);
       setOAuthState({
@@ -881,6 +894,70 @@ export function AddAccountDialog({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startTraeBrowserLogin = async () => {
+    if (!providerId) return;
+
+    setError(null);
+    setOAuthDialogOpen(true);
+    setOAuthState({
+      status: "starting",
+      statusText: copy.presets.trae.browserLoginPreparing,
+    });
+
+    let existingFingerprint: string | null = null;
+    try {
+      const existing = await invoke<TraeLocalSessionImport>("import_trae_local_session");
+      existingFingerprint = [
+        existing.email?.trim().toLowerCase() || "",
+        existing.username?.trim().toLowerCase() || "",
+      ].join("|");
+    } catch {
+      existingFingerprint = null;
+    }
+
+    try {
+      await openInBrowser("https://www.trae.ai/login");
+
+      setOAuthState({
+        status: "waiting",
+        statusText: copy.presets.trae.browserLoginWaiting,
+      });
+
+      for (let attempt = 0; attempt < 90; attempt += 1) {
+        await sleep(2000);
+
+        try {
+          const detected = await invoke<TraeLocalSessionImport>("import_trae_local_session");
+          const nextFingerprint = [
+            detected.email?.trim().toLowerCase() || "",
+            detected.username?.trim().toLowerCase() || "",
+          ].join("|");
+
+          if (existingFingerprint && nextFingerprint === existingFingerprint) {
+            continue;
+          }
+
+          const created = await createTraeAccount(detected);
+          setOAuthState({
+            status: "success",
+            statusText: copy.presets.trae.success,
+            detailLines: buildAccountSummaryLines(copy, created),
+          });
+          return;
+        } catch {
+          continue;
+        }
+      }
+
+      throw new Error(copy.presets.trae.browserLoginTimeout);
+    } catch (err) {
+      setOAuthState({
+        status: "error",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -1465,6 +1542,22 @@ export function AddAccountDialog({
 
   const startAntigravityOauth = async () => {
     if (!providerId) return;
+
+    const availability = await invoke<AntigravityOAuthAvailabilityResponse>(
+      "get_antigravity_oauth_availability"
+    );
+    if (!availability.configured) {
+      const missingList = availability.missing.join(", ");
+      setOAuthDialogOpen(true);
+      setOAuthState({
+        status: "error",
+        error:
+          lang === "zh"
+            ? `当前构建没有配置 Anti-Gravity OAuth，缺少 ${missingList}。请先补上这些环境变量，再使用 Google 登录流程。`
+            : `Anti-Gravity OAuth is not configured in this build. Missing ${missingList}. Add these environment variables before using the Google sign-in flow.`,
+      });
+      return;
+    }
 
     setOAuthDialogOpen(true);
     setOAuthState({
@@ -2100,6 +2193,15 @@ export function AddAccountDialog({
 
             {providerId === "trae" ? (
               <div className="space-y-4">
+                <PrimaryActionPanel
+                  providerId={providerId}
+                  icon={<Globe className="size-4" />}
+                  title={copy.presets.trae.browserLoginTitle}
+                  summary={copy.presets.trae.browserLoginSummary}
+                  actionLabel={copy.presets.trae.browserLoginAction}
+                  onAction={startTraeBrowserLogin}
+                  disabled={loading}
+                />
                 <PrimaryActionPanel
                   providerId={providerId}
                   icon={<MonitorSmartphone className="size-4" />}

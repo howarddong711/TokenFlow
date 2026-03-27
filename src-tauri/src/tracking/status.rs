@@ -2,15 +2,17 @@ use crate::core::AccountRecord;
 
 use super::gateway;
 use super::local_logs;
-use super::provider_reports;
 use super::provider_reported_summary;
+use super::provider_reports;
 use super::types::{RequestTrackingSource, RequestTrackingStatus};
 
 pub fn build_tracking_status(accounts: &[AccountRecord]) -> RequestTrackingStatus {
     let mut sources = Vec::new();
     sources.extend(gateway::collect_tracking_sources());
     sources.extend(provider_reports::collect_tracking_sources(accounts));
-    sources.extend(provider_reported_summary::collect_tracking_sources(accounts));
+    sources.extend(provider_reported_summary::collect_tracking_sources(
+        accounts,
+    ));
     sources.extend(local_logs::collect_tracking_sources());
 
     let ready_sources: Vec<&RequestTrackingSource> = sources
@@ -21,9 +23,21 @@ pub fn build_tracking_status(accounts: &[AccountRecord]) -> RequestTrackingStatu
     let primary = ready_sources
         .iter()
         .find(|source| source.source_type == "gateway_observed")
-        .or_else(|| ready_sources.iter().find(|source| source.source_type == "local_inferred"))
-        .or_else(|| ready_sources.iter().find(|source| source.source_type == "provider_reported_summary"))
-        .or_else(|| ready_sources.iter().find(|source| source.source_type == "provider_reported"))
+        .or_else(|| {
+            ready_sources
+                .iter()
+                .find(|source| source.source_type == "local_inferred")
+        })
+        .or_else(|| {
+            ready_sources
+                .iter()
+                .find(|source| source.source_type == "provider_reported_summary")
+        })
+        .or_else(|| {
+            ready_sources
+                .iter()
+                .find(|source| source.source_type == "provider_reported")
+        })
         .copied();
 
     let overall_status = if ready_sources.is_empty() {
@@ -87,22 +101,19 @@ mod tests {
 
     #[test]
     fn provider_reported_summary_source_appears_when_supported_accounts_exist() {
-        let status = build_tracking_status(&[account(
-            ProviderId::Copilot,
-            AccountAuthKind::OAuthToken,
-        )]);
+        let status =
+            build_tracking_status(&[account(ProviderId::Copilot, AccountAuthKind::OAuthToken)]);
         assert!(status
             .sources
             .iter()
-            .any(|source| source.source_type == "provider_reported_summary" && source.status == "ready"));
+            .any(|source| source.source_type == "provider_reported_summary"
+                && source.status == "ready"));
     }
 
     #[test]
     fn provider_reported_quota_source_appears_for_non_summary_sources() {
-        let status = build_tracking_status(&[account(
-            ProviderId::Codex,
-            AccountAuthKind::OAuthToken,
-        )]);
+        let status =
+            build_tracking_status(&[account(ProviderId::Codex, AccountAuthKind::OAuthToken)]);
         assert!(status
             .sources
             .iter()

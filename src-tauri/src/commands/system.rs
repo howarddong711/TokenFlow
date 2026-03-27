@@ -1,9 +1,9 @@
 use std::{path::PathBuf, sync::Mutex};
 
+use crate::core::{clear_debug_log as clear_app_debug_log, debug_log_path, read_debug_log};
 use serde::Serialize;
 use tauri::AppHandle;
 use tauri_plugin_updater::{Update, UpdaterExt};
-use crate::core::{clear_debug_log as clear_app_debug_log, debug_log_path, read_debug_log};
 
 pub struct PendingAppUpdate(pub Mutex<Option<Update>>);
 

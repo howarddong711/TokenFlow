@@ -141,7 +141,12 @@ fn build_local_tracking_detail(
 
 fn default_opencode_db_path() -> Option<PathBuf> {
     let home = dirs::home_dir()?;
-    Some(home.join(".local").join("share").join("opencode").join("opencode.db"))
+    Some(
+        home.join(".local")
+            .join("share")
+            .join("opencode")
+            .join("opencode.db"),
+    )
 }
 
 fn default_cursor_tracking_db_path() -> Option<PathBuf> {
@@ -223,48 +228,49 @@ fn parse_codex_request_logs(
             .or(current_model.clone())
             .unwrap_or_else(|| "gpt-5".to_string());
 
-        let (input_tokens, output_tokens) = if let Some(total) =
-            info.and_then(|item| item.get("total_token_usage"))
-        {
-            let input = total
-                .get("input_tokens")
-                .and_then(|value| value.as_i64())
-                .unwrap_or(0) as i32;
-            let cached = total
-                .get("cached_input_tokens")
-                .or(total.get("cache_read_input_tokens"))
-                .and_then(|value| value.as_i64())
-                .unwrap_or(0) as i32;
-            let output = total
-                .get("output_tokens")
-                .and_then(|value| value.as_i64())
-                .unwrap_or(0) as i32;
+        let (input_tokens, output_tokens) =
+            if let Some(total) = info.and_then(|item| item.get("total_token_usage")) {
+                let input = total
+                    .get("input_tokens")
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or(0) as i32;
+                let cached = total
+                    .get("cached_input_tokens")
+                    .or(total.get("cache_read_input_tokens"))
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or(0) as i32;
+                let output = total
+                    .get("output_tokens")
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or(0) as i32;
 
-            let delta_input = (input - previous_totals.as_ref().map_or(0, |totals| totals.input)).max(0);
-            let _delta_cached =
-                (cached - previous_totals.as_ref().map_or(0, |totals| totals.cached)).max(0);
-            let delta_output = (output - previous_totals.as_ref().map_or(0, |totals| totals.output)).max(0);
+                let delta_input =
+                    (input - previous_totals.as_ref().map_or(0, |totals| totals.input)).max(0);
+                let _delta_cached =
+                    (cached - previous_totals.as_ref().map_or(0, |totals| totals.cached)).max(0);
+                let delta_output =
+                    (output - previous_totals.as_ref().map_or(0, |totals| totals.output)).max(0);
 
-            previous_totals = Some(CodexTotals {
-                input,
-                cached,
-                output,
-            });
+                previous_totals = Some(CodexTotals {
+                    input,
+                    cached,
+                    output,
+                });
 
-            (delta_input, delta_output)
-        } else if let Some(last) = info.and_then(|item| item.get("last_token_usage")) {
-            let input = last
-                .get("input_tokens")
-                .and_then(|value| value.as_i64())
-                .unwrap_or(0) as i32;
-            let output = last
-                .get("output_tokens")
-                .and_then(|value| value.as_i64())
-                .unwrap_or(0) as i32;
-            (input.max(0), output.max(0))
-        } else {
-            continue;
-        };
+                (delta_input, delta_output)
+            } else if let Some(last) = info.and_then(|item| item.get("last_token_usage")) {
+                let input = last
+                    .get("input_tokens")
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or(0) as i32;
+                let output = last
+                    .get("output_tokens")
+                    .and_then(|value| value.as_i64())
+                    .unwrap_or(0) as i32;
+                (input.max(0), output.max(0))
+            } else {
+                continue;
+            };
 
         if input_tokens == 0 && output_tokens == 0 {
             continue;
@@ -446,14 +452,12 @@ fn parse_cursor_request_logs(
 }
 
 fn extract_provider_name<'a>(json: &'a Value) -> Option<&'a str> {
-    json.get("providerID")
-        .and_then(Value::as_str)
-        .or_else(|| {
-            json.get("model")
-                .and_then(Value::as_object)
-                .and_then(|model| model.get("providerID"))
-                .and_then(Value::as_str)
-        })
+    json.get("providerID").and_then(Value::as_str).or_else(|| {
+        json.get("model")
+            .and_then(Value::as_object)
+            .and_then(|model| model.get("providerID"))
+            .and_then(Value::as_str)
+    })
 }
 
 fn extract_model_name(json: &Value) -> Option<String> {
@@ -469,10 +473,7 @@ fn extract_model_name(json: &Value) -> Option<String> {
         })
 }
 
-fn map_opencode_provider(
-    provider_name: &str,
-    json: &Value,
-) -> Option<ProviderId> {
+fn map_opencode_provider(provider_name: &str, json: &Value) -> Option<ProviderId> {
     match provider_name {
         "openai" => Some(ProviderId::Codex),
         "github-copilot" => Some(ProviderId::Copilot),

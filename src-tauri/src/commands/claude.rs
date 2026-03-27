@@ -22,8 +22,9 @@ pub async fn start_claude_oauth_login() -> Result<ClaudeOAuthStartResponse, Stri
         .credentials_fingerprint()
         .map_err(|err| err.to_string())?;
 
-    let claude_path = which::which("claude")
-        .map_err(|_| "Claude CLI not found. Install Claude Code and make sure `claude` is in PATH.".to_string())?;
+    let claude_path = which::which("claude").map_err(|_| {
+        "Claude CLI not found. Install Claude Code and make sure `claude` is in PATH.".to_string()
+    })?;
 
     #[cfg(windows)]
     {
@@ -39,12 +40,15 @@ pub async fn start_claude_oauth_login() -> Result<ClaudeOAuthStartResponse, Stri
 
     #[cfg(not(windows))]
     {
-        return Err("Claude OAuth login launch is only implemented for Windows in this phase.".to_string());
+        return Err(
+            "Claude OAuth login launch is only implemented for Windows in this phase.".to_string(),
+        );
     }
 
     Ok(ClaudeOAuthStartResponse {
         previous_fingerprint,
-        status_text: "Claude CLI login launched. Complete sign-in in the opened window/browser.".to_string(),
+        status_text: "Claude CLI login launched. Complete sign-in in the opened window/browser."
+            .to_string(),
     })
 }
 
