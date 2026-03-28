@@ -7,16 +7,16 @@
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-black?style=flat-square)
 
-TokenFlow 是一个面向 Windows 的 AI 编码账号与额度管理桌面应用，用来把多个主力 provider 的真实额度窗口放到同一个本地工作台里查看。
+TokenFlow 是一个面向 Windows 的 AI 编码账号与额度管理桌面应用，用来把多个主力 provider 的额度窗口放到同一个本地工作台里查看。
 
-它不会把所有平台硬压成一个假的统一额度模型，而是尽量保留每个 provider 自己的额度语义。你可以在一个应用里连接账号、对比额度窗口、查看请求活动、排查日志，并把本地 AI 工具链整理得更清楚。
+它把账号连接、额度窗口、请求活动、本地日志和工作区整理能力整合进同一个 Windows 桌面工作流，方便持续管理日常 AI 编码环境。
 
 ![TokenFlow Dashboard](./screenshots/dashboard.png)
 
 ## 为什么用 TokenFlow
 
 - 一个桌面工作区统一管理主要 AI 编码账号
-- 保留 provider-native quota 语义，而不是猜测式统一百分比
+- 以 provider-native quota 语义展示各平台额度窗口
 - 快速查看账号 plan、健康状态、重置时间和最近更新时间
 - 提供本地日志和请求可见性，方便排查问题
 - 本地优先存储，敏感凭据保存在系统凭据存储中
@@ -91,15 +91,4 @@ npm run build
 
 ```bash
 npm run tauri -- build
-```
-
-## OAuth 环境变量
-
-部分 provider 登录流程需要私有 OAuth 凭据，这些值不会存放在仓库中。
-
-```bash
-TOKENFLOW_ANTIGRAVITY_CLIENT_ID=
-TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET=
-TOKENFLOW_IFLOW_CLIENT_ID=
-TOKENFLOW_IFLOW_CLIENT_SECRET=
 ```

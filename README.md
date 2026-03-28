@@ -7,16 +7,16 @@
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-black?style=flat-square)
 
-TokenFlow is a Windows desktop app for managing AI coding accounts and their real provider-native quota windows in one place.
+TokenFlow is a Windows desktop app for managing AI coding accounts and their provider-native quota windows in one place.
 
-Instead of flattening every provider into a fake shared quota model, TokenFlow keeps each platform's own semantics intact. You can connect accounts, compare quota windows, inspect request activity, review logs, and keep your local AI tooling workspace organized.
+It brings account connections, quota windows, request activity, local logs, and workspace organization into a single desktop workflow for AI coding on Windows.
 
 ![TokenFlow Dashboard](./screenshots/dashboard.png)
 
 ## Why TokenFlow
 
 - One desktop workspace for your main AI coding accounts
-- Provider-native quota windows instead of guessed unified percentages
+- Provider-native quota windows with each provider's own semantics
 - Fast account overview for plan, health, reset windows, and recent updates
 - Local logs and request visibility for troubleshooting
 - Local-first storage with secrets kept in the system credential store
@@ -91,15 +91,4 @@ npm run build
 
 ```bash
 npm run tauri -- build
-```
-
-## OAuth Environment Variables
-
-Some provider login flows require private OAuth credentials that are intentionally not stored in this repository.
-
-```bash
-TOKENFLOW_ANTIGRAVITY_CLIENT_ID=
-TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET=
-TOKENFLOW_IFLOW_CLIENT_ID=
-TOKENFLOW_IFLOW_CLIENT_SECRET=
 ```
