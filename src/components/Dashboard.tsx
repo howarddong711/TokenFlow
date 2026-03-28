@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils";
 import type { ProviderAccount, ProviderId, ProviderUsageWindow, TokenQuota } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.3";
+const APP_VERSION = "0.1.4";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,
@@ -912,6 +912,7 @@ function ProvidersPage({
   const [deletingAccount, setDeletingAccount] = useState<ProviderAccount | null>(null);
   const [draftAlias, setDraftAlias] = useState("");
   const [submittingAccountAction, setSubmittingAccountAction] = useState(false);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
   const orderedProviderAccounts = useMemo(
     () => sortAccountsByLoginOrder(activeSummary?.providerAccounts ?? []),
     [activeSummary?.providerAccounts]
@@ -925,6 +926,7 @@ function ProvidersPage({
 
   const handleSaveAlias = async () => {
     if (!editingAccount) return;
+    setAccountActionError(null);
     setSubmittingAccountAction(true);
     try {
       await onRenameAccount(
@@ -936,6 +938,8 @@ function ProvidersPage({
           "Account"
       );
       setEditingAccount(null);
+    } catch (error) {
+      setAccountActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmittingAccountAction(false);
     }
@@ -943,10 +947,14 @@ function ProvidersPage({
 
   const handleDeleteAccount = async () => {
     if (!deletingAccount) return;
+    const targetAccount = deletingAccount;
+    setDeletingAccount(null);
+    setAccountActionError(null);
     setSubmittingAccountAction(true);
     try {
-      await onRemoveAccount(deletingAccount.accountId);
-      setDeletingAccount(null);
+      await onRemoveAccount(targetAccount.accountId);
+    } catch (error) {
+      setAccountActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setSubmittingAccountAction(false);
     }
@@ -1022,6 +1030,11 @@ function ProvidersPage({
               {hideAccountIdentity ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </Button>
           </div>
+          {accountActionError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {accountActionError}
+            </div>
+          ) : null}
           <div className="grid gap-4 xl:grid-cols-2">
             {orderedProviderAccounts.length > 0 ? (
               orderedProviderAccounts.map((account) => (
@@ -1032,8 +1045,14 @@ function ProvidersPage({
                   privacyMode={privacyMode || hideAccountIdentity}
                   copy={copy}
                   layout={accountCardLayout}
-                  onEditAlias={() => setEditingAccount(account)}
-                  onDelete={() => setDeletingAccount(account)}
+                  onEditAlias={() => {
+                    setAccountActionError(null);
+                    setEditingAccount(account);
+                  }}
+                  onDelete={() => {
+                    setAccountActionError(null);
+                    setDeletingAccount(account);
+                  }}
                 />
               ))
             ) : (

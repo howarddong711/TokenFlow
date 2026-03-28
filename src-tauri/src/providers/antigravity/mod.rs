@@ -55,21 +55,45 @@ impl AntigravityProvider {
             || lower.contains("/antigravity/")
     }
 
-    fn client_id() -> Result<String, ProviderError> {
+    fn runtime_client_id() -> Option<String> {
         env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
+    }
+
+    fn compiled_client_id() -> Option<String> {
+        option_env!("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    }
+
+    fn client_id() -> Result<String, ProviderError> {
+        Self::runtime_client_id()
+            .or_else(Self::compiled_client_id)
             .ok_or_else(|| {
                 ProviderError::Other("Missing TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string())
             })
     }
 
-    fn client_secret() -> Result<String, ProviderError> {
+    fn runtime_client_secret() -> Option<String> {
         env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
+    }
+
+    fn compiled_client_secret() -> Option<String> {
+        option_env!("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    }
+
+    fn client_secret() -> Result<String, ProviderError> {
+        Self::runtime_client_secret()
+            .or_else(Self::compiled_client_secret)
             .ok_or_else(|| {
                 ProviderError::Other("Missing TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string())
             })

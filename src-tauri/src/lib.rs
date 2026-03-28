@@ -131,6 +131,7 @@ pub fn run() {
             qwen::import_qwen_cli_oauth_from_path,
             antigravity::start_antigravity_oauth,
             antigravity::get_antigravity_oauth_availability,
+            antigravity::import_antigravity_local_session,
             antigravity::antigravity_wait_for_callback,
             antigravity::antigravity_exchange_token,
             antigravity::get_antigravity_user_info,

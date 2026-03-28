@@ -1,4 +1,7 @@
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use reqwest::Client;
+use rusqlite::Connection;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -13,7 +16,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::time::timeout;
 
-use crate::core::append_debug_log;
+use crate::core::{append_debug_log, OAuthCredentials};
 
 const CALLBACK_PORT: u16 = 51121;
 const AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -77,6 +80,14 @@ pub struct RefreshTokenResponse {
     pub expires_in: i64,
 }
 
+#[derive(Debug, Serialize)]
+pub struct AntigravityLocalSessionImportResponse {
+    pub credentials: OAuthCredentials,
+    pub email: Option<String>,
+    pub username: Option<String>,
+    pub plan: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct GoogleTokenResponse {
     access_token: String,
@@ -101,6 +112,20 @@ struct CodeAssistResponse {
 struct GoogleRefreshResponse {
     access_token: String,
     expires_in: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AntigravityStoredOAuthToken {
+    access_token: String,
+    refresh_token: Option<String>,
+    expiry_date_seconds: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AntigravityAuthStatus {
+    name: Option<String>,
+    email: Option<String>,
 }
 
 fn format_reqwest_error(err: &reqwest::Error) -> String {
@@ -290,29 +315,169 @@ fn extract_query_param(request_line: &str, param: &str) -> Option<String> {
     None
 }
 
-fn antigravity_client_id() -> Result<String, String> {
+fn runtime_antigravity_client_id() -> Option<String> {
     env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn compiled_antigravity_client_id() -> Option<String> {
+    option_env!("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn antigravity_client_id() -> Result<String, String> {
+    runtime_antigravity_client_id()
+        .or_else(compiled_antigravity_client_id)
         .ok_or_else(|| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string())
 }
 
-fn antigravity_client_secret() -> Result<String, String> {
+fn runtime_antigravity_client_secret() -> Option<String> {
     env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn compiled_antigravity_client_secret() -> Option<String> {
+    option_env!("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn antigravity_client_secret() -> Result<String, String> {
+    runtime_antigravity_client_secret()
+        .or_else(compiled_antigravity_client_secret)
         .ok_or_else(|| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string())
+}
+
+fn antigravity_state_db_path() -> Result<std::path::PathBuf, String> {
+    let appdata =
+        env::var("APPDATA").map_err(|_| "Could not resolve APPDATA for Anti-Gravity".to_string())?;
+    let path = std::path::PathBuf::from(appdata)
+        .join("Antigravity")
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    if !path.exists() {
+        return Err(
+            "Anti-Gravity local session not found. Sign in with the Anti-Gravity desktop app first."
+                .to_string(),
+        );
+    }
+    Ok(path)
+}
+
+fn extract_json_from_embedded_base64(raw: &str) -> Option<String> {
+    let bytes = raw.as_bytes();
+    let mut start = None;
+
+    for (index, byte) in bytes.iter().enumerate() {
+        let is_base64 = byte.is_ascii_alphanumeric() || matches!(*byte, b'+' | b'/' | b'=');
+        match (start, is_base64) {
+            (None, true) => start = Some(index),
+            (Some(chunk_start), false) => {
+                if index.saturating_sub(chunk_start) >= 80 {
+                    let candidate = &raw[chunk_start..index];
+                    if let Ok(decoded) = STANDARD.decode(candidate) {
+                        let text = String::from_utf8_lossy(&decoded);
+                        if let (Some(json_start), Some(json_end)) = (text.find('{'), text.rfind('}'))
+                        {
+                            return Some(text[json_start..=json_end].to_string());
+                        }
+                    }
+                }
+                start = None;
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(chunk_start) = start {
+        let candidate = &raw[chunk_start..];
+        if candidate.len() >= 80 {
+            if let Ok(decoded) = STANDARD.decode(candidate) {
+                let text = String::from_utf8_lossy(&decoded);
+                if let (Some(json_start), Some(json_end)) = (text.find('{'), text.rfind('}')) {
+                    return Some(text[json_start..=json_end].to_string());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn read_antigravity_local_session() -> Result<AntigravityLocalSessionImportResponse, String> {
+    let db_path = antigravity_state_db_path()?;
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open Anti-Gravity local storage: {e}"))?;
+
+    let raw_oauth: String = conn
+        .query_row(
+            "SELECT value FROM ItemTable WHERE key = 'antigravityUnifiedStateSync.oauthToken'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|_| {
+            "Anti-Gravity OAuth session not found. Sign in with the Anti-Gravity desktop app first."
+                .to_string()
+        })?;
+
+    let oauth_json = extract_json_from_embedded_base64(&raw_oauth)
+        .ok_or_else(|| "Failed to decode Anti-Gravity OAuth session".to_string())?;
+    let token: AntigravityStoredOAuthToken = serde_json::from_str(&oauth_json)
+        .map_err(|e| format!("Failed to parse Anti-Gravity OAuth session: {e}"))?;
+
+    if token.access_token.trim().is_empty() {
+        return Err("Anti-Gravity local session does not contain an access token".to_string());
+    }
+
+    let auth_status = conn
+        .query_row(
+            "SELECT value FROM ItemTable WHERE key = 'antigravityAuthStatus'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|raw| serde_json::from_str::<AntigravityAuthStatus>(&raw).ok());
+
+    let expires_at = token
+        .expiry_date_seconds
+        .and_then(|seconds| chrono::DateTime::<chrono::Utc>::from_timestamp(seconds, 0));
+
+    Ok(AntigravityLocalSessionImportResponse {
+        credentials: OAuthCredentials {
+            access_token: token.access_token,
+            refresh_token: token
+                .refresh_token
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            expires_at,
+            scopes: vec![],
+            rate_limit_tier: Some("Antigravity Local Session".to_string()),
+        },
+        email: auth_status.as_ref().and_then(|status| status.email.clone()),
+        username: auth_status.as_ref().and_then(|status| status.name.clone()),
+        plan: None,
+    })
 }
 
 #[tauri::command]
 pub fn get_antigravity_oauth_availability(app: AppHandle) -> OAuthAvailabilityResponse {
     let mut missing = Vec::new();
-    if antigravity_client_id().is_err() {
+    let has_client_id = runtime_antigravity_client_id().is_some() || compiled_antigravity_client_id().is_some();
+    let has_client_secret =
+        runtime_antigravity_client_secret().is_some() || compiled_antigravity_client_secret().is_some();
+
+    if !has_client_id {
         missing.push("TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string());
     }
-    if antigravity_client_secret().is_err() {
+    if !has_client_secret {
         missing.push("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string());
     }
 
@@ -320,13 +485,52 @@ pub fn get_antigravity_oauth_availability(app: AppHandle) -> OAuthAvailabilityRe
     append_debug_log(
         &app,
         "antigravity.oauth",
-        format!("availability configured={configured} missing={missing:?}"),
+        format!(
+            "availability configured={configured} missing={missing:?} runtime_client_id={} compiled_client_id={} runtime_client_secret={} compiled_client_secret={}",
+            runtime_antigravity_client_id().is_some(),
+            compiled_antigravity_client_id().is_some(),
+            runtime_antigravity_client_secret().is_some(),
+            compiled_antigravity_client_secret().is_some(),
+        ),
     );
 
     OAuthAvailabilityResponse {
         configured,
         missing,
     }
+}
+
+#[tauri::command]
+pub fn import_antigravity_local_session(
+    app: AppHandle,
+) -> Result<AntigravityLocalSessionImportResponse, String> {
+    let result = read_antigravity_local_session();
+    match &result {
+        Ok(session) => append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!(
+                "import_local_session success email_present={} refresh_present={} expires_at={}",
+                session.email.as_ref().is_some_and(|value| !value.is_empty()),
+                session
+                    .credentials
+                    .refresh_token
+                    .as_ref()
+                    .is_some_and(|value| !value.is_empty()),
+                session
+                    .credentials
+                    .expires_at
+                    .map(|value| value.to_rfc3339())
+                    .unwrap_or_else(|| "none".to_string())
+            ),
+        ),
+        Err(err) => append_debug_log(
+            &app,
+            "antigravity.oauth",
+            format!("import_local_session failed error={err}"),
+        ),
+    }
+    result
 }
 
 #[tauri::command]

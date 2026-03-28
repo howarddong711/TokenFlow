@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { buildProviderUsageSnapshot, usageSnapshotToLegacyQuotas } from "@/lib/provider-native";
 import type {
@@ -218,6 +218,11 @@ export function useAccounts(): UseAccountsReturn {
   const [capabilityList, setCapabilityList] = useState<ProviderCapabilityDto[]>([]);
   const [isRestoring, setIsRestoring] = useState(true);
   const fetchInFlightRef = useRef(false);
+  const accountsRef = useRef<ProviderAccount[]>([]);
+
+  useEffect(() => {
+    accountsRef.current = accounts;
+  }, [accounts]);
 
   const capabilityMap = useMemo(
     () =>
@@ -317,8 +322,28 @@ export function useAccounts(): UseAccountsReturn {
   }, [fetchAll]);
 
   const removeAccount = useCallback(async (accountId: string) => {
-    await invoke("remove_account", { accountId });
-    await fetchAll();
+    const previousAccounts = accountsRef.current;
+    const nextAccounts = previousAccounts.filter((account) => account.accountId !== accountId);
+
+    if (nextAccounts.length === previousAccounts.length) {
+      return;
+    }
+
+    accountsRef.current = nextAccounts;
+    startTransition(() => {
+      setAccounts(nextAccounts);
+    });
+
+    try {
+      await invoke("remove_account", { accountId });
+      void fetchAll();
+    } catch (error) {
+      accountsRef.current = previousAccounts;
+      startTransition(() => {
+        setAccounts(previousAccounts);
+      });
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   }, [fetchAll]);
 
   const renameAccount = useCallback(async (accountId: string, label: string) => {

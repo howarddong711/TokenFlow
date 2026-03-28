@@ -201,6 +201,19 @@ interface AntigravityOAuthAvailabilityResponse {
   missing: string[];
 }
 
+interface AntigravityLocalSessionImportResponse {
+  credentials: {
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: string;
+    scopes: string[];
+    rate_limit_tier?: string;
+  };
+  email?: string;
+  username?: string;
+  plan?: string;
+}
+
 interface AntigravityCallbackResult {
   code: string;
 }
@@ -1547,16 +1560,47 @@ export function AddAccountDialog({
       "get_antigravity_oauth_availability"
     );
     if (!availability.configured) {
-      const missingList = availability.missing.join(", ");
-      setOAuthDialogOpen(true);
-      setOAuthState({
-        status: "error",
-        error:
-          lang === "zh"
-            ? `当前构建没有配置 Anti-Gravity OAuth，缺少 ${missingList}。请先补上这些环境变量，再使用 Google 登录流程。`
-            : `Anti-Gravity OAuth is not configured in this build. Missing ${missingList}. Add these environment variables before using the Google sign-in flow.`,
-      });
-      return;
+      try {
+        const imported = await invoke<AntigravityLocalSessionImportResponse>(
+          "import_antigravity_local_session"
+        );
+
+        const created = await onAddAccount({
+          providerId,
+          label: label.trim() || imported.email || imported.username || undefined,
+          authKind: "oauth_token",
+          secret: {
+            kind: "oauth",
+            credentials: imported.credentials,
+          },
+          display: {
+            email: imported.email,
+            username: imported.username,
+            plan: imported.plan ?? "Anti-Gravity",
+          },
+          default: setAsDefault,
+        });
+
+        setOAuthDialogOpen(true);
+        setOAuthState({
+          status: "success",
+          statusText: copy.presets.antigravity.success,
+          detailLines: buildAccountSummaryLines(copy, created),
+        });
+        return;
+      } catch (importErr) {
+        const missingList = availability.missing.join(", ");
+        const importMessage = importErr instanceof Error ? importErr.message : String(importErr);
+        setOAuthDialogOpen(true);
+        setOAuthState({
+          status: "error",
+          error:
+            lang === "zh"
+              ? `当前构建没有配置 Anti-Gravity OAuth，缺少 ${missingList}。本机 Anti-Gravity 会话导入也失败了：${importMessage}`
+              : `Anti-Gravity OAuth is not configured in this build. Missing ${missingList}. Local Anti-Gravity session import also failed: ${importMessage}`,
+        });
+        return;
+      }
     }
 
     setOAuthDialogOpen(true);
