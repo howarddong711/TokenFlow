@@ -16,20 +16,6 @@ if /i "%VERSION:~0,1%"=="v" (
   set "VERSION=%VERSION:~1%"
 )
 
-if "%TOKENFLOW_ANTIGRAVITY_CLIENT_ID%"=="" (
-  echo.
-  echo [TokenFlow] Missing TOKENFLOW_ANTIGRAVITY_CLIENT_ID.
-  echo [TokenFlow] Set Anti-Gravity OAuth credentials in this shell before running release.bat.
-  exit /b 1
-)
-
-if "%TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET%"=="" (
-  echo.
-  echo [TokenFlow] Missing TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET.
-  echo [TokenFlow] Set Anti-Gravity OAuth credentials in this shell before running release.bat.
-  exit /b 1
-)
-
 if "%TAURI_SIGNING_PRIVATE_KEY%"=="" if "%TAURI_SIGNING_PRIVATE_KEY_PATH%"=="" (
   echo.
   echo [TokenFlow] Missing TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH.
@@ -75,6 +61,5 @@ if errorlevel 1 (
 echo.
 echo [TokenFlow] Release build completed for v%VERSION%.
 echo [TokenFlow] Build artifacts should now be under src-tauri\target\release\bundle\
-echo [TokenFlow] Source remains secret-free; this installer contains the build-time Anti-Gravity OAuth credentials.
 
 exit /b 0

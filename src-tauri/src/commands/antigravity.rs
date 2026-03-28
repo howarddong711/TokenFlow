@@ -315,43 +315,19 @@ fn extract_query_param(request_line: &str, param: &str) -> Option<String> {
     None
 }
 
-fn runtime_antigravity_client_id() -> Option<String> {
+fn antigravity_client_id() -> Result<String, String> {
     env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
-}
-
-fn compiled_antigravity_client_id() -> Option<String> {
-    option_env!("TOKENFLOW_ANTIGRAVITY_CLIENT_ID")
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-fn antigravity_client_id() -> Result<String, String> {
-    runtime_antigravity_client_id()
-        .or_else(compiled_antigravity_client_id)
         .ok_or_else(|| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string())
 }
 
-fn runtime_antigravity_client_secret() -> Option<String> {
+fn antigravity_client_secret() -> Result<String, String> {
     env::var("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
-}
-
-fn compiled_antigravity_client_secret() -> Option<String> {
-    option_env!("TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET")
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-fn antigravity_client_secret() -> Result<String, String> {
-    runtime_antigravity_client_secret()
-        .or_else(compiled_antigravity_client_secret)
         .ok_or_else(|| "Missing TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET".to_string())
 }
 
@@ -470,9 +446,8 @@ fn read_antigravity_local_session() -> Result<AntigravityLocalSessionImportRespo
 #[tauri::command]
 pub fn get_antigravity_oauth_availability(app: AppHandle) -> OAuthAvailabilityResponse {
     let mut missing = Vec::new();
-    let has_client_id = runtime_antigravity_client_id().is_some() || compiled_antigravity_client_id().is_some();
-    let has_client_secret =
-        runtime_antigravity_client_secret().is_some() || compiled_antigravity_client_secret().is_some();
+    let has_client_id = antigravity_client_id().is_ok();
+    let has_client_secret = antigravity_client_secret().is_ok();
 
     if !has_client_id {
         missing.push("TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string());
@@ -486,11 +461,9 @@ pub fn get_antigravity_oauth_availability(app: AppHandle) -> OAuthAvailabilityRe
         &app,
         "antigravity.oauth",
         format!(
-            "availability configured={configured} missing={missing:?} runtime_client_id={} compiled_client_id={} runtime_client_secret={} compiled_client_secret={}",
-            runtime_antigravity_client_id().is_some(),
-            compiled_antigravity_client_id().is_some(),
-            runtime_antigravity_client_secret().is_some(),
-            compiled_antigravity_client_secret().is_some(),
+            "availability configured={configured} missing={missing:?} client_id={} client_secret={}",
+            has_client_id,
+            has_client_secret,
         ),
     );
 
