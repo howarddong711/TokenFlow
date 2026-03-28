@@ -7,52 +7,54 @@
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-black?style=flat-square)
 
-TokenFlow is a Windows desktop command center for AI coding accounts, local request visibility, and provider-native quota windows.
+TokenFlow is a Windows desktop app for managing AI coding accounts and their real provider-native quota windows in one place.
 
-It keeps multiple providers in one workspace without flattening them into a fake shared quota model. You can connect accounts, inspect quota windows, review local request activity, and export logs.
+Instead of flattening every provider into a fake shared quota model, TokenFlow keeps each platform's own semantics intact. You can connect accounts, compare quota windows, inspect request activity, review logs, and keep your local AI tooling workspace organized.
 
 ![TokenFlow Dashboard](./screenshots/dashboard.png)
 
-## Features
+## Why TokenFlow
 
-- Multi-provider workspace for AI coding accounts on Windows
-- Provider-native quota windows instead of a synthetic unified quota model
-- Dashboard for token usage, request volume, provider coverage, and account health
-- Provider views for per-account status, quota windows, and recent activity
-- Request logs and local app logs for debugging
+- One desktop workspace for your main AI coding accounts
+- Provider-native quota windows instead of guessed unified percentages
+- Fast account overview for plan, health, reset windows, and recent updates
+- Local logs and request visibility for troubleshooting
 - Local-first storage with secrets kept in the system credential store
-- Built-in update checks and automatic update support via GitHub Releases
+- Windows installers and GitHub Release-based update flow
 
-## Supported Workflow
+## Supported Providers
 
-### Account and quota management
+TokenFlow currently focuses on these providers:
 
 - OpenAI Codex
-- GitHub Copilot
-- Claude
-- Gemini
-- Qwen
-- Vertex AI
-- iFlow
-- Antigravity
-- Kiro
-- OpenCode
-- Warp
-
-### Local session and usage monitoring
-
 - Cursor
 - Trae
+- Anti-Gravity
+- GitHub Copilot
 
-Support varies by provider. Some flows use OAuth, some import CLI or local credentials, and some are monitor-only depending on what the provider actually exposes.
+Support differs by provider. Some providers use OAuth, some read local sessions, and some expose richer quota windows than others.
+
+## Screenshots
+
+| Dashboard | Providers |
+| --- | --- |
+| ![Dashboard](./screenshots/dashboard.png) | ![Providers](./screenshots/providers.png) |
+
+| Logs | API Keys |
+| --- | --- |
+| ![Logs](./screenshots/logs.png) | ![API Keys](./screenshots/api_key.png) |
+
+| Settings | About |
+| --- | --- |
+| ![Settings](./screenshots/settings.png) | ![About](./screenshots/about.png) |
 
 ## Installation
 
 ### Download
 
-Download the latest Windows installer from the [Releases](https://github.com/howarddong711/TokenFlow/releases/latest) page.
+Download the latest Windows build from the [Releases](https://github.com/howarddong711/TokenFlow/releases/latest) page.
 
-Available release assets include:
+Release assets include:
 
 - a versioned NSIS `.exe` installer
 - a versioned `.msi` installer
@@ -93,7 +95,7 @@ npm run tauri -- build
 
 ## OAuth Environment Variables
 
-Some provider flows require private OAuth credentials that are intentionally not stored in this repository.
+Some provider login flows require private OAuth credentials that are intentionally not stored in this repository.
 
 ```bash
 TOKENFLOW_ANTIGRAVITY_CLIENT_ID=
@@ -101,17 +103,3 @@ TOKENFLOW_ANTIGRAVITY_CLIENT_SECRET=
 TOKENFLOW_IFLOW_CLIENT_ID=
 TOKENFLOW_IFLOW_CLIENT_SECRET=
 ```
-
-## Screenshots
-
-| Dashboard | Providers |
-| --- | --- |
-| ![Dashboard](./screenshots/dashboard.png) | ![Providers](./screenshots/providers.png) |
-
-| Logs | Settings |
-| --- | --- |
-| ![Logs](./screenshots/logs.png) | ![Settings](./screenshots/settings.png) |
-
-| About |
-| --- |
-| ![About](./screenshots/about.png) |
