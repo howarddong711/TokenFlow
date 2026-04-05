@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils";
 import type { ProviderAccount, ProviderId, ProviderUsageWindow, TokenQuota } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.6";
+const APP_VERSION = "0.1.7";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,

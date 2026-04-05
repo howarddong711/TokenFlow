@@ -7,7 +7,7 @@
     "updater": {
       "endpoints": [
         "https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json",
-        "https://ghproxy.com/https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json"
+        "https://gh.llkk.cc/https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json"
       ]
     }
   }
