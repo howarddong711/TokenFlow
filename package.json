@@ -1,7 +1,7 @@
 {
   "name": "tokenflow",
   "private": false,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "license": "MIT",
   "description": "Windows and macOS desktop dashboard for AI coding accounts, token usage, and provider-native quota windows.",
   "author": "Howard Dong",

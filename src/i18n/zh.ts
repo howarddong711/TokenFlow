@@ -13,7 +13,7 @@ const zh = {
   "sidebar.providers": "服务商",
   "sidebar.tokenDashboard": "Token 面板",
   "sidebar.settings": "设置",
-  "sidebar.version": "TokenFlow v0.1.5",
+  "sidebar.version": "TokenFlow v0.1.6",
   "provider.connected": "已连接",
   "provider.connecting": "连接中...",
   "provider.error": "错误",

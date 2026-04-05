@@ -6,7 +6,8 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json"
+        "https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json",
+        "https://ghproxy.com/https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json"
       ]
     }
   }
