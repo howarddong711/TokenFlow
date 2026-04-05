@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getAccountRiskLevel } from "@/lib/monitoring";
 import type { ProviderAccount } from "@/types";
 import { PROVIDERS } from "@/types";
@@ -41,35 +40,7 @@ function buildTooltipSummary(accounts: ProviderAccount[], status?: TrayStatus): 
     .join("\n");
 }
 
-export function useTray(accounts: ProviderAccount[], status?: TrayStatus, enabled = true) {
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-
-    const setup = async () => {
-      const appWindow = getCurrentWindow();
-      unlisten = await appWindow.onCloseRequested((event) => {
-        if (enabled) {
-          event.preventDefault();
-          void appWindow.hide().catch(() => {
-            void appWindow.minimize();
-          });
-          return;
-        }
-
-        event.preventDefault();
-        void invoke("quit_app").catch(() => {
-          void appWindow.destroy();
-        });
-      });
-    };
-
-    void setup();
-
-    return () => {
-      unlisten?.();
-    };
-  }, [enabled]);
-
+export function useTray(accounts: ProviderAccount[], status?: TrayStatus) {
   useEffect(() => {
     const summary = buildTooltipSummary(accounts, status);
     invoke("update_tray_tooltip", { summary }).catch(() => {

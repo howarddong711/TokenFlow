@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils";
 import type { ProviderAccount, ProviderId, ProviderUsageWindow, TokenQuota } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.7";
+const APP_VERSION = "0.1.8";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,
@@ -144,8 +144,7 @@ export function Dashboard() {
     {
       inboxCount: logCenter.requestSummary.totalRequests,
       isQuietMode: false,
-    },
-    preferences.minimizeToTray
+    }
   );
 
   const providerColors = preferences.providerColors;
@@ -521,14 +520,12 @@ export function Dashboard() {
             <SettingsPage
               theme={preferences.theme}
               privacyMode={preferences.privacyMode}
-              minimizeToTray={preferences.minimizeToTray}
               launchOnStartup={preferences.launchOnStartup}
               autoUpdate={preferences.autoUpdate}
               autoUpdateSupported={appUpdater.policy.inAppUpdatesEnabled}
               providerColors={preferences.providerColors}
               onThemeChange={preferenceActions.setTheme}
               onPrivacyModeChange={preferenceActions.setPrivacyMode}
-              onMinimizeToTrayChange={preferenceActions.setMinimizeToTray}
               onLaunchOnStartupChange={preferenceActions.setLaunchOnStartup}
               onAutoUpdateChange={preferenceActions.setAutoUpdate}
               onProviderColorChange={preferenceActions.setProviderColor}

@@ -23,14 +23,12 @@ import { PROVIDERS } from "@/types";
 interface SettingsPageProps {
   theme: WorkspaceTheme;
   privacyMode: boolean;
-  minimizeToTray: boolean;
   launchOnStartup: boolean;
   autoUpdate: boolean;
   autoUpdateSupported: boolean;
   providerColors: Record<ProviderId, string>;
   onThemeChange: (theme: WorkspaceTheme) => void;
   onPrivacyModeChange: (enabled: boolean) => void;
-  onMinimizeToTrayChange: (enabled: boolean) => void;
   onLaunchOnStartupChange: (enabled: boolean) => void;
   onAutoUpdateChange: (enabled: boolean) => void;
   onProviderColorChange: (providerId: ProviderId, color: string) => void;
@@ -45,14 +43,12 @@ const LANGUAGE_OPTIONS = [
 export function SettingsPage({
   theme,
   privacyMode,
-  minimizeToTray,
   launchOnStartup,
   autoUpdate,
   autoUpdateSupported,
   providerColors,
   onThemeChange,
   onPrivacyModeChange,
-  onMinimizeToTrayChange,
   onLaunchOnStartupChange,
   onAutoUpdateChange,
   onProviderColorChange,
@@ -80,13 +76,6 @@ export function SettingsPage({
             value={launchOnStartup ? copy.settings.enabled : copy.settings.disabled}
             checked={launchOnStartup}
             onChange={onLaunchOnStartupChange}
-          />
-          <ToggleTile
-            icon={<PlayCircle className="size-4" />}
-            label={copy.settings.minimizeToTray}
-            value={minimizeToTray ? copy.settings.enabled : copy.settings.disabled}
-            checked={minimizeToTray}
-            onChange={onMinimizeToTrayChange}
           />
           <ToggleTile
             icon={<Download className="size-4" />}

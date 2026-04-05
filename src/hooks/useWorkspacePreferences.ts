@@ -9,7 +9,6 @@ export type WorkspaceTheme = "light" | "dark" | "system";
 export interface WorkspacePreferences {
   theme: WorkspaceTheme;
   privacyMode: boolean;
-  minimizeToTray: boolean;
   launchOnStartup: boolean;
   autoUpdate: boolean;
   providerColors: Record<ProviderId, string>;
@@ -39,7 +38,6 @@ const DEFAULT_PROVIDER_COLORS = Object.fromEntries(
 const DEFAULT_PREFERENCES: WorkspacePreferences = {
   theme: "system",
   privacyMode: false,
-  minimizeToTray: true,
   launchOnStartup: false,
   autoUpdate: false,
   providerColors: DEFAULT_PROVIDER_COLORS,
@@ -63,10 +61,6 @@ function readPreferences(): WorkspacePreferences {
           ? parsed.theme
           : DEFAULT_PREFERENCES.theme,
       privacyMode: Boolean(parsed.privacyMode),
-      minimizeToTray:
-        typeof parsed.minimizeToTray === "boolean"
-          ? parsed.minimizeToTray
-          : DEFAULT_PREFERENCES.minimizeToTray,
       launchOnStartup:
         typeof parsed.launchOnStartup === "boolean"
           ? parsed.launchOnStartup
@@ -144,11 +138,6 @@ export function useWorkspacePreferences() {
         setPreferences((current) => ({
           ...current,
           privacyMode,
-        })),
-      setMinimizeToTray: (minimizeToTray: boolean) =>
-        setPreferences((current) => ({
-          ...current,
-          minimizeToTray,
         })),
       setLaunchOnStartup: (launchOnStartup: boolean) =>
         setPreferences((current) => ({

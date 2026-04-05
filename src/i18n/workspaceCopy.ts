@@ -242,8 +242,8 @@ const ENGLISH = {
     startup: "Startup",
     startupHelp:
       "Control what happens when the window closes and prepare launch-at-login preferences for the desktop runtime.",
-    minimizeToTray: "Closing the window hides TokenFlow to the tray",
-    minimizeToTrayValue: "Always enabled",
+    minimizeToTray: "Hide TokenFlow to the tray when closing",
+    minimizeToTrayValue: "Optional",
     launchOnStartup: "Launch on system startup",
     autoUpdate: "Automatically check and install updates",
     providerColors: "Provider colors",
@@ -260,7 +260,7 @@ const ENGLISH = {
     resetColorsDescription: "This will restore all provider colors to the default palette.",
     quit: "Quit application",
     startupNote:
-      "The title-bar close button now always hides TokenFlow to the tray. Use the tray menu or Quit application to fully exit.",
+      "When this is on, the title-bar close button hides TokenFlow to the tray. Turn it off if you want close to fully exit the app.",
   },
   about: {
     title: "About",
@@ -515,8 +515,8 @@ const CHINESE = {
     privacyHelp: "全局隐藏邮箱和用户名，适合演示、录屏或截图。",
     startup: "启动行为",
     startupHelp: "说明关闭窗口后的行为，并预留开机自启动偏好。",
-    minimizeToTray: "点击右上角关闭按钮时会隐藏到托盘",
-    minimizeToTrayValue: "固定启用",
+    minimizeToTray: "关闭窗口时隐藏到托盘",
+    minimizeToTrayValue: "可选",
     launchOnStartup: "开机自动启动",
     autoUpdate: "自动检查并安装更新",
     providerColors: "供应商颜色",
@@ -531,7 +531,7 @@ const CHINESE = {
     resetColorsTitle: "恢复供应商颜色",
     resetColorsDescription: "这会把所有供应商颜色恢复为默认配色。",
     quit: "退出应用",
-    startupNote: "右上角关闭按钮现在会固定隐藏到托盘。真正退出请使用托盘菜单或“退出应用”。",
+    startupNote: "开启后，右上角关闭按钮会把 TokenFlow 隐藏到托盘。关闭后，点叉会真正退出应用。",
   },
   about: {
     title: "关于",
