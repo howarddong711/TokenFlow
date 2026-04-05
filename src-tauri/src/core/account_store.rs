@@ -9,9 +9,11 @@ use tauri_plugin_store::{Store, StoreExt};
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::platform;
+
 use super::{
     append_debug_log, AccountRecord, AccountSecret, AccountSecretRef, CredentialError,
-    CredentialStore, WindowsCredentialStore,
+    CredentialStore,
 };
 
 const STORE_FILE: &str = "accounts.json";
@@ -41,7 +43,7 @@ impl<R: Runtime> AccountRepository<R> {
     pub fn new(app: AppHandle<R>) -> Self {
         Self {
             app,
-            credential_store: Arc::new(WindowsCredentialStore::new()),
+            credential_store: platform::default_credential_store(),
         }
     }
 

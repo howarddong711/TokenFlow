@@ -47,14 +47,19 @@ export function useTray(accounts: ProviderAccount[], status?: TrayStatus, enable
 
     const setup = async () => {
       const appWindow = getCurrentWindow();
-      unlisten = await appWindow.onCloseRequested(async (event) => {
+      unlisten = await appWindow.onCloseRequested((event) => {
         if (enabled) {
           event.preventDefault();
-          await appWindow.hide();
+          void appWindow.hide().catch(() => {
+            void appWindow.minimize();
+          });
           return;
         }
 
-        await invoke("quit_app");
+        event.preventDefault();
+        void invoke("quit_app").catch(() => {
+          void appWindow.destroy();
+        });
       });
     };
 

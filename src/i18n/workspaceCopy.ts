@@ -235,6 +235,7 @@ const ENGLISH = {
     system: "System",
     enabled: "On",
     disabled: "Off",
+    unavailable: "Unavailable",
     privacy: "Privacy mode",
     privacyHelp:
       "Hide emails and usernames throughout the workspace. Useful when presenting or recording.",
@@ -278,6 +279,10 @@ const ENGLISH = {
     updateInstalling: "Installing the update now. TokenFlow may close and relaunch automatically.",
     updateInstalled: "The update package finished installing. If the app did not relaunch automatically, open TokenFlow again.",
     updateError: (message: string) => `Update failed: ${message}`,
+    updateManagedByStore:
+      "This build is distributed through the Mac App Store. Please update TokenFlow from the App Store.",
+    updateDisabledByChannel: (channel: string) =>
+      `In-app updates are disabled for this build channel (${channel}).`,
     installUpdate: "Install update",
     releaseNotes: "Release notes",
     autoUpdateEnabled: "Automatic background updates are enabled in Settings.",
@@ -505,6 +510,7 @@ const CHINESE = {
     system: "跟随系统",
     enabled: "开启",
     disabled: "关闭",
+    unavailable: "不可用",
     privacy: "隐私模式",
     privacyHelp: "全局隐藏邮箱和用户名，适合演示、录屏或截图。",
     startup: "启动行为",
@@ -543,6 +549,9 @@ const CHINESE = {
     updateInstalling: "正在安装更新。TokenFlow 可能会自动关闭并重新启动。",
     updateInstalled: "更新包已经安装完成。如果应用没有自动重新打开，请手动启动 TokenFlow。",
     updateError: (message: string) => `更新失败：${message}`,
+    updateManagedByStore: "当前构建来自 Mac App Store，请在 App Store 中更新 TokenFlow。",
+    updateDisabledByChannel: (channel: string) =>
+      `当前构建渠道（${channel}）禁用了应用内更新。`,
     installUpdate: "立即安装",
     releaseNotes: "更新说明",
     autoUpdateEnabled: "设置里已开启后台自动更新。",

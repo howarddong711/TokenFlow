@@ -1,8 +1,8 @@
 use serde_json::json;
 use tauri::AppHandle;
 
-use crate::browser::cookies::{self, get_all_cookie_headers_by_profile};
 use crate::core::{AccountRepository, FetchContext, JsonlScanner, ProviderId};
+use crate::platform;
 use crate::providers;
 use crate::tracking::{self, ProviderReportedSummary, RequestLogEntry, RequestTrackingStatus};
 
@@ -54,7 +54,7 @@ pub async fn fetch_all_providers_usage() -> Result<serde_json::Value, String> {
         // to support multiple accounts logged in via different browsers/profiles.
         if COOKIE_AUTH_PROVIDERS.contains(id) {
             if let Some(domain) = id.cookie_domain() {
-                let cookie_sets = get_all_cookie_headers_by_profile(domain);
+                let cookie_sets = platform::extract_browser_cookie_sets(domain);
 
                 if cookie_sets.is_empty() {
                     // No cookies found in any browser — report as single entry
@@ -153,7 +153,7 @@ pub async fn get_local_cost_summary() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 pub async fn extract_browser_cookie(domain: String) -> Result<String, String> {
-    cookies::get_cookie_header(&domain).map_err(|e| e.to_string())
+    platform::extract_browser_cookie(&domain)
 }
 
 #[tauri::command]

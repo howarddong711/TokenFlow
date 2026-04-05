@@ -623,6 +623,16 @@ export function AddAccountDialog({
     () => getAuthKindsForProvider(providerId, capability),
     [capability, providerId]
   );
+  const platformStatus = capability?.platform_status ?? "full";
+  const platformNote = capability?.platform_note;
+  const providerUnsupported =
+    !!providerId &&
+    preset?.mode !== "system" &&
+    (platformStatus === "unsupported" || supportedAuthKinds.length === 0);
+  const providerPartiallySupported = !providerUnsupported && platformStatus === "partial";
+  const supportsLocalDetected = supportedAuthKinds.includes("local_detected");
+  const supportsBrowserProfileCookie = supportedAuthKinds.includes("browser_profile_cookie");
+  const supportsManualCookie = supportedAuthKinds.includes("manual_cookie");
   const providerExistingAccounts = useMemo(
     () =>
       providerId
@@ -706,6 +716,7 @@ export function AddAccountDialog({
       : authKind === "oauth_token" || authKind === "imported_cli_oauth"
         ? secretValue.trim().length > 0
         : false);
+  const canSubmitCursorManualCookie = !loading && !!providerId && secretValue.trim().length > 0;
   const canSubmitVertexServiceAccount =
     !loading && !!providerId && vertexServiceAccountText.trim().length > 0;
   const vertexServiceAccountPreview = useMemo(() => {
@@ -791,6 +802,27 @@ export function AddAccountDialog({
       }
 
       await onAddAccount(input);
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitCursorManualCookieAccount = async () => {
+    if (!providerId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await onAddAccount({
+        providerId,
+        label: label.trim() || undefined,
+        authKind: "manual_cookie",
+        secret: { kind: "manual_cookie", cookie_header: secretValue.trim() },
+        display: {},
+        default: setAsDefault,
+      });
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -1839,6 +1871,18 @@ export function AddAccountDialog({
               </div>
             ) : null}
 
+            {providerPartiallySupported ? (
+              <DuplicateWarningPanel
+                title={lang === "zh" ? "当前平台为部分支持" : "Partial support on this platform"}
+                body={
+                  platformNote ??
+                  (lang === "zh"
+                    ? `${providerName} 在当前系统上仅支持部分接入方式。`
+                    : `${providerName} only supports part of the account import flows on this platform.`)
+                }
+              />
+            ) : null}
+
             {providerId &&
             ["cursor", "trae", "kiro"].includes(providerId) &&
             existingLocalSessionAccounts.length > 0 ? (
@@ -1848,6 +1892,29 @@ export function AddAccountDialog({
                 detail={copy.shared.alreadyMonitoring(joinAccountLabels(existingLocalSessionAccounts))}
               />
             ) : null}
+
+            {providerUnsupported ? (
+              <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+                <div className="flex items-start gap-2 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {lang === "zh" ? "当前系统暂不支持该接入方式" : "This provider is unavailable on this platform"}
+                    </p>
+                    <p className="mt-1 leading-6">
+                      {platformNote ??
+                        (lang === "zh"
+                          ? `${providerName} 目前无法在当前系统完成账号接入。`
+                          : `${providerName} cannot be connected from the current runtime platform yet.`)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={() => onOpenChange(false)}>{copy.shared.close}</Button>
+                </div>
+              </div>
+            ) : (
+              <>
 
             {providerId === "codex" ? (
               oauthState.status === "idle" ? (
@@ -2139,41 +2206,47 @@ export function AddAccountDialog({
 
             {providerId === "cursor" ? (
               <div className="space-y-4">
-                <PrimaryActionPanel
-                  providerId={providerId}
-                  icon={<MonitorSmartphone className="size-4" />}
-                  title={copy.presets.cursor.localSessionTitle}
-                  summary={copy.presets.cursor.localSessionSummary}
-                  actionLabel={copy.presets.cursor.localSessionAction}
-                  onAction={importCursorLocalSession}
-                  disabled={loading || cursorProfilesLoading}
-                />
+                {supportsLocalDetected ? (
+                  <PrimaryActionPanel
+                    providerId={providerId}
+                    icon={<MonitorSmartphone className="size-4" />}
+                    title={copy.presets.cursor.localSessionTitle}
+                    summary={copy.presets.cursor.localSessionSummary}
+                    actionLabel={copy.presets.cursor.localSessionAction}
+                    onAction={importCursorLocalSession}
+                    disabled={loading || cursorProfilesLoading}
+                  />
+                ) : null}
 
-                <PrimaryActionPanel
-                  providerId={providerId}
-                  icon={<Globe className="size-4" />}
-                  title={copy.presets.cursor.browserLoginTitle}
-                  summary={copy.presets.cursor.browserLoginSummary}
-                  actionLabel={copy.presets.cursor.browserLoginAction}
-                  onAction={startCursorBrowserLogin}
-                  disabled={loading || cursorProfilesLoading}
-                />
+                {supportsBrowserProfileCookie ? (
+                  <PrimaryActionPanel
+                    providerId={providerId}
+                    icon={<Globe className="size-4" />}
+                    title={copy.presets.cursor.browserLoginTitle}
+                    summary={copy.presets.cursor.browserLoginSummary}
+                    actionLabel={copy.presets.cursor.browserLoginAction}
+                    onAction={startCursorBrowserLogin}
+                    disabled={loading || cursorProfilesLoading}
+                  />
+                ) : null}
 
-                <PrimaryActionPanel
-                  providerId={providerId}
-                  icon={<ScanSearch className="size-4" />}
-                  title={copy.presets.cursor.primaryTitle}
-                  summary={copy.presets.cursor.primarySummary}
-                  actionLabel={
-                    cursorProfilesLoading
-                      ? copy.presets.cursor.scanning
-                      : copy.presets.cursor.primaryAction
-                  }
-                  onAction={loadCursorBrowserProfiles}
-                  disabled={cursorProfilesLoading || loading}
-                />
+                {supportsBrowserProfileCookie ? (
+                  <PrimaryActionPanel
+                    providerId={providerId}
+                    icon={<ScanSearch className="size-4" />}
+                    title={copy.presets.cursor.primaryTitle}
+                    summary={copy.presets.cursor.primarySummary}
+                    actionLabel={
+                      cursorProfilesLoading
+                        ? copy.presets.cursor.scanning
+                        : copy.presets.cursor.primaryAction
+                    }
+                    onAction={loadCursorBrowserProfiles}
+                    disabled={cursorProfilesLoading || loading}
+                  />
+                ) : null}
 
-                {cursorProfiles.length > 0 ? (
+                {supportsBrowserProfileCookie && cursorProfiles.length > 0 ? (
                   <div className="space-y-2 rounded-2xl border border-border/70 bg-background/70 p-4">
                     <div className="flex items-center gap-2">
                       <ProviderIcon providerId={providerId} size={16} />
@@ -2220,18 +2293,20 @@ export function AddAccountDialog({
                   </div>
                 ) : null}
 
-                <SecretForm
-                  secretLabel={copy.presets.cursor.manualCookieFallback}
-                  secretPlaceholder={copy.presets.cursor.manualCookiePlaceholder}
-                  secretValue={secretValue}
-                  onSecretChange={setSecretValue}
-                  multiline
-                  onCancel={() => onOpenChange(false)}
-                  onSubmit={submitManualAccount}
-                  submitLabel={copy.shared.addWithCookie}
-                  disabled={!canSubmitManual}
-                  helperText={copy.presets.cursor.manualCookieHelper}
-                />
+                {supportsManualCookie ? (
+                  <SecretForm
+                    secretLabel={copy.presets.cursor.manualCookieFallback}
+                    secretPlaceholder={copy.presets.cursor.manualCookiePlaceholder}
+                    secretValue={secretValue}
+                    onSecretChange={setSecretValue}
+                    multiline
+                    onCancel={() => onOpenChange(false)}
+                    onSubmit={submitCursorManualCookieAccount}
+                    submitLabel={copy.shared.addWithCookie}
+                    disabled={!canSubmitCursorManualCookie}
+                    helperText={copy.presets.cursor.manualCookieHelper}
+                  />
+                ) : null}
               </div>
             ) : null}
 
@@ -2311,6 +2386,8 @@ export function AddAccountDialog({
                 </div>
               </div>
             ) : null}
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

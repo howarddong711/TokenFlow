@@ -1,12 +1,13 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{Duration as ChronoDuration, Utc};
 use rusqlite::Connection;
 use serde_json::Value;
 
 use crate::core::{CodexTotals, CostUsageDayRange, JsonlScanner, ProviderId};
+use crate::platform;
 
 use super::types::{RequestLogEntry, RequestTrackingSource};
 
@@ -31,13 +32,13 @@ pub fn collect_request_logs(days: u32) -> Result<Vec<RequestLogEntry>, String> {
         }
     }
 
-    if let Some(opencode_db) = default_opencode_db_path() {
+    if let Some(opencode_db) = platform::opencode_db_path() {
         let mut file_entries = parse_opencode_request_logs(&opencode_db, &range)
             .map_err(|err| format!("Failed to read {}: {err}", opencode_db.display()))?;
         entries.append(&mut file_entries);
     }
 
-    if let Some(cursor_tracking_db) = default_cursor_tracking_db_path() {
+    if let Some(cursor_tracking_db) = platform::cursor_tracking_db_path() {
         let mut file_entries = parse_cursor_request_logs(&cursor_tracking_db, &range)
             .map_err(|err| format!("Failed to read {}: {err}", cursor_tracking_db.display()))?;
         entries.append(&mut file_entries);
@@ -53,12 +54,12 @@ pub fn collect_tracking_sources() -> Vec<RequestTrackingSource> {
         .as_ref()
         .map(|path| path.exists())
         .unwrap_or(false);
-    let opencode_db = default_opencode_db_path();
+    let opencode_db = platform::opencode_db_path();
     let opencode_ready = opencode_db
         .as_ref()
         .map(|path| path.exists())
         .unwrap_or(false);
-    let cursor_tracking_db = default_cursor_tracking_db_path();
+    let cursor_tracking_db = platform::cursor_tracking_db_path();
     let cursor_ready = cursor_tracking_db
         .as_ref()
         .map(|path| path.exists())
@@ -137,25 +138,6 @@ fn build_local_tracking_detail(
     } else {
         parts.join(" ")
     }
-}
-
-fn default_opencode_db_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    Some(
-        home.join(".local")
-            .join("share")
-            .join("opencode")
-            .join("opencode.db"),
-    )
-}
-
-fn default_cursor_tracking_db_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    Some(
-        home.join(".cursor")
-            .join("ai-tracking")
-            .join("ai-code-tracking.db"),
-    )
 }
 
 fn parse_codex_request_logs(

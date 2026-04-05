@@ -19,6 +19,7 @@ use crate::core::{
     FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
     RateWindow, SourceMode, UsageSnapshot,
 };
+use crate::platform::extract_browser_cookie;
 
 const BASE_URL: &str = "https://opencode.ai";
 const SERVER_URL: &str = "https://opencode.ai/_server";
@@ -26,6 +27,7 @@ const WORKSPACES_SERVER_ID: &str =
     "def39973159c7f0483d8793a822b8dbb10d067e12c65455fcb4608459ba0234f";
 const SUBSCRIPTION_SERVER_ID: &str =
     "7abeebee372f304e050aaaf92be863f4a86490e382f8c79db68fd94040d691b4";
+const WEB_USER_AGENT: &str = "Mozilla/5.0";
 
 /// OpenCode provider
 pub struct OpenCodeProvider {
@@ -82,10 +84,7 @@ impl OpenCodeProvider {
             .header("Cookie", cookie_header)
             .header("X-Server-Id", WORKSPACES_SERVER_ID)
             .header("X-Server-Instance", format!("server-fn:{}", Uuid::new_v4()))
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
+            .header("User-Agent", WEB_USER_AGENT)
             .header("Origin", BASE_URL)
             .header("Referer", BASE_URL)
             .header(
@@ -141,10 +140,7 @@ impl OpenCodeProvider {
             .header("Cookie", cookie_header)
             .header("X-Server-Id", SUBSCRIPTION_SERVER_ID)
             .header("X-Server-Instance", format!("server-fn:{}", Uuid::new_v4()))
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
+            .header("User-Agent", WEB_USER_AGENT)
             .header("Origin", BASE_URL)
             .header("Referer", referer)
             .header(
@@ -404,33 +400,11 @@ impl Provider for OpenCodeProvider {
                     return Ok(ProviderFetchResult::new(usage, "web"));
                 }
 
-                // Try to get cookies from browser
-                #[cfg(windows)]
-                {
-                    use crate::browser::cookies::{Cookie, CookieExtractor};
-                    use crate::browser::detection::BrowserDetector;
-
-                    let browsers = BrowserDetector::detect_all();
-
-                    for browser in browsers {
-                        if let Ok(cookies) =
-                            CookieExtractor::extract_for_domain(&browser, "opencode.ai")
-                        {
-                            // Build cookie header
-                            let cookie_header: String = cookies
-                                .iter()
-                                .map(|c: &Cookie| format!("{}={}", c.name, c.value))
-                                .collect::<Vec<_>>()
-                                .join("; ");
-
-                            if !cookie_header.is_empty() {
-                                match self.fetch_with_cookies(&cookie_header).await {
-                                    Ok(usage) => return Ok(ProviderFetchResult::new(usage, "web")),
-                                    Err(ProviderError::AuthRequired) => continue,
-                                    Err(e) => return Err(e),
-                                }
-                            }
-                        }
+                // Try to get cookies from local browser profiles through the platform adapter.
+                if let Ok(cookie_header) = extract_browser_cookie("opencode.ai") {
+                    if !cookie_header.trim().is_empty() {
+                        let usage = self.fetch_with_cookies(&cookie_header).await?;
+                        return Ok(ProviderFetchResult::new(usage, "web"));
                     }
                 }
 

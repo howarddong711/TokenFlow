@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::json;
+use std::process::Command;
 
 use crate::core::{
     FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
@@ -171,15 +172,16 @@ impl WarpProvider {
             .build()
             .map_err(|e| ProviderError::Other(e.to_string()))?;
 
-        let os_version = "10.0";
+        let (os_category, os_name) = current_os_context();
+        let os_version = current_os_version();
         let body = json!({
             "query": GRAPHQL_QUERY,
             "variables": {
                 "requestContext": {
                     "clientContext": {},
                     "osContext": {
-                        "category": "Windows",
-                        "name": "Windows",
+                        "category": os_category,
+                        "name": os_name,
                         "version": os_version
                     }
                 }
@@ -192,9 +194,9 @@ impl WarpProvider {
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
             .header("x-warp-client-id", "warp-app")
-            .header("x-warp-os-category", "Windows")
-            .header("x-warp-os-name", "Windows")
-            .header("x-warp-os-version", os_version)
+            .header("x-warp-os-category", os_category)
+            .header("x-warp-os-name", os_name)
+            .header("x-warp-os-version", os_version.clone())
             .header("Authorization", format!("Bearer {}", api_key))
             .header("User-Agent", "Warp/1.0")
             .json(&body)
@@ -307,6 +309,46 @@ impl WarpProvider {
         }
 
         Ok(usage)
+    }
+}
+
+fn current_os_context() -> (&'static str, &'static str) {
+    #[cfg(target_os = "windows")]
+    {
+        ("Windows", "Windows")
+    }
+    #[cfg(target_os = "macos")]
+    {
+        ("Mac", "macOS")
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        ("Linux", "Linux")
+    }
+}
+
+fn current_os_version() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        return "10.0".to_string();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = Command::new("sw_vers").arg("-productVersion").output() {
+            if output.status.success() {
+                let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !version.is_empty() {
+                    return version;
+                }
+            }
+        }
+        return "14.0".to_string();
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        std::env::var("OSTYPE").unwrap_or_else(|_| "unknown".to_string())
     }
 }
 

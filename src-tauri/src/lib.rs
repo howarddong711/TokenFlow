@@ -1,6 +1,7 @@
 mod browser;
 mod commands;
 mod core;
+mod platform;
 mod providers;
 mod tracking;
 mod tray_icon;
@@ -36,8 +37,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            if system::in_app_updater_enabled() {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+            }
             app.manage(system::PendingAppUpdate::default());
 
             fn show_main_window(app: &tauri::AppHandle) {
@@ -153,6 +156,7 @@ pub fn run() {
             usage::get_provider_reported_summary,
             usage::extract_browser_cookie,
             system::quit_app,
+            system::get_app_update_policy,
             system::get_debug_log,
             system::clear_debug_log,
             system::get_debug_log_path,

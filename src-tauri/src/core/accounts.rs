@@ -18,6 +18,13 @@ const COOKIE_AUTH_KINDS: &[AccountAuthKind] = &[
 ];
 const LOCAL_ONLY_AUTH_KINDS: &[AccountAuthKind] = &[AccountAuthKind::LocalDetected];
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuntimeAccountCapability {
+    pub auth_kinds: Vec<AccountAuthKind>,
+    pub platform_status: &'static str,
+    pub platform_note: Option<&'static str>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccountAuthKind {
     #[serde(rename = "oauth_token", alias = "o_auth_token")]
@@ -285,6 +292,26 @@ impl ProviderId {
     pub fn is_system_managed_only(&self) -> bool {
         matches!(self, ProviderId::JetBrains)
     }
+
+    pub fn runtime_account_capability(&self) -> RuntimeAccountCapability {
+        let auth_kinds = self.supported_account_auth_kinds().to_vec();
+        let mut platform_status = "full";
+        let mut platform_note = None;
+
+        if auth_kinds.is_empty() && !self.is_system_managed_only() {
+            platform_status = "unsupported";
+            if platform_note.is_none() {
+                platform_note =
+                    Some("This provider cannot be added on the current runtime platform.");
+            }
+        }
+
+        RuntimeAccountCapability {
+            auth_kinds,
+            platform_status,
+            platform_note,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -321,5 +348,22 @@ mod tests {
             .supported_account_auth_kinds()
             .contains(&AccountAuthKind::LocalDetected));
         assert!(ProviderId::Codex.prefers_native_oauth());
+    }
+
+    #[test]
+    fn runtime_capabilities_include_supported_auth_kinds() {
+        let capability = ProviderId::Claude.runtime_account_capability();
+        assert!(capability.auth_kinds.contains(&AccountAuthKind::OAuthToken));
+        assert_ne!(capability.platform_status, "unsupported");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn cursor_runtime_capability_keeps_browser_profile_cookie_on_macos() {
+        let capability = ProviderId::Cursor.runtime_account_capability();
+        assert!(capability
+            .auth_kinds
+            .contains(&AccountAuthKind::BrowserProfileCookie));
+        assert_eq!(capability.platform_status, "full");
     }
 }

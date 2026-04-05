@@ -6,12 +6,12 @@ use serde_json::Value;
 use tauri::AppHandle;
 use uuid::Uuid;
 
-use crate::browser::cookies::get_all_cookie_headers_by_profile;
 use crate::core::{
     append_debug_log, AccountAuthKind, AccountDisplay, AccountRecord, AccountRepository,
     AccountSecret, AccountSecretRef, AccountUsageResult, FetchContext, OAuthCredentials,
     ProviderError, ProviderId,
 };
+use crate::platform::extract_browser_cookie_sets;
 use crate::providers;
 
 const CURSOR_COOKIE_DOMAINS: [&str; 2] = ["cursor.com", "cursor.sh"];
@@ -34,6 +34,9 @@ pub struct ProviderCapabilityDto {
     pub auth_kinds: Vec<AccountAuthKind>,
     pub prefers_native_oauth: bool,
     pub system_managed_only: bool,
+    pub platform_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub platform_note: Option<String>,
 }
 
 #[tauri::command]
@@ -54,11 +57,16 @@ pub async fn list_accounts(app: AppHandle) -> Result<Vec<AccountRecord>, String>
 pub async fn list_provider_capabilities() -> Result<Vec<ProviderCapabilityDto>, String> {
     Ok(ProviderId::all()
         .iter()
-        .map(|provider_id| ProviderCapabilityDto {
-            provider: provider_id.cli_name().to_string(),
-            auth_kinds: provider_id.supported_account_auth_kinds().to_vec(),
-            prefers_native_oauth: provider_id.prefers_native_oauth(),
-            system_managed_only: provider_id.is_system_managed_only(),
+        .map(|provider_id| {
+            let runtime_capability = provider_id.runtime_account_capability();
+            ProviderCapabilityDto {
+                provider: provider_id.cli_name().to_string(),
+                auth_kinds: runtime_capability.auth_kinds,
+                prefers_native_oauth: provider_id.prefers_native_oauth(),
+                system_managed_only: provider_id.is_system_managed_only(),
+                platform_status: runtime_capability.platform_status.to_string(),
+                platform_note: runtime_capability.platform_note.map(ToOwned::to_owned),
+            }
         })
         .collect())
 }
@@ -714,7 +722,7 @@ fn refresh_cursor_cookie_secret(secret: Option<&AccountSecret>) -> Option<Accoun
     let target = browser_label.trim().to_lowercase();
     let cookie_set = CURSOR_COOKIE_DOMAINS
         .iter()
-        .flat_map(|domain| get_all_cookie_headers_by_profile(domain))
+        .flat_map(|domain| extract_browser_cookie_sets(domain))
         .find(|candidate| candidate.browser_label.trim().to_lowercase() == target)?;
 
     Some(AccountSecret::BrowserProfileCookie {
@@ -865,14 +873,17 @@ fn validate_add_account_input(
         ));
     }
 
-    if !provider_id
-        .supported_account_auth_kinds()
-        .contains(&input.auth_kind)
-    {
+    let runtime_capability = provider_id.runtime_account_capability();
+    if !runtime_capability.auth_kinds.contains(&input.auth_kind) {
+        let platform_hint = runtime_capability
+            .platform_note
+            .map(|note| format!(" ({note})"))
+            .unwrap_or_default();
         return Err(format!(
-            "{} does not support auth kind {:?}",
+            "{} does not support auth kind {:?} on this platform{}",
             provider_id.display_name(),
-            input.auth_kind
+            input.auth_kind,
+            platform_hint
         ));
     }
 

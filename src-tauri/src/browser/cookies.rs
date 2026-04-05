@@ -1,4 +1,4 @@
-//! Cookie extraction for Windows browsers
+//! Cookie extraction for desktop browsers
 //!
 //! Chromium browsers store cookies in an SQLite database encrypted with DPAPI.
 //! Firefox stores cookies in an unencrypted SQLite database.
@@ -11,11 +11,19 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+#[cfg(windows)]
 use base64::Engine;
 use rusqlite::Connection;
 use thiserror::Error;
 
-use super::detection::{BrowserProfile, DetectedBrowser};
+use super::detection::{BrowserProfile, BrowserType, DetectedBrowser};
+
+#[cfg(target_os = "macos")]
+use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
+#[cfg(target_os = "macos")]
+use pbkdf2::pbkdf2_hmac;
+#[cfg(target_os = "macos")]
+use sha1::Sha1;
 
 /// Errors that can occur during cookie extraction
 #[derive(Debug, Error)]
@@ -120,10 +128,11 @@ impl CookieExtractor {
         // Get the encryption key from Local State
         let local_state_path = profile.local_state_path(&browser.user_data_dir);
         tracing::debug!("Local State path: {:?}", local_state_path);
-        let encryption_key = Self::get_chromium_encryption_key(&local_state_path).map_err(|e| {
-            tracing::debug!("Failed to get encryption key: {}", e);
-            e
-        })?;
+        let encryption_key = Self::get_chromium_encryption_key(browser, &local_state_path)
+            .map_err(|e| {
+                tracing::debug!("Failed to get encryption key: {}", e);
+                e
+            })?;
         tracing::debug!("Got encryption key ({} bytes)", encryption_key.len());
 
         // Copy the database to a temp file (browser may have it locked)
@@ -171,13 +180,14 @@ impl CookieExtractor {
                 row?;
 
             // Decrypt the cookie value
-            let value = match Self::decrypt_chromium_cookie(&encrypted_value, &encryption_key) {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::debug!("Failed to decrypt cookie {}: {}", name, e);
-                    continue;
-                }
-            };
+            let value =
+                match Self::decrypt_chromium_cookie(browser, &encrypted_value, &encryption_key) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::debug!("Failed to decrypt cookie {}: {}", name, e);
+                        continue;
+                    }
+                };
 
             cookies.push(Cookie {
                 name,
@@ -202,8 +212,33 @@ impl CookieExtractor {
         Ok(cookies)
     }
 
-    /// Get the Chromium encryption key from Local State
-    fn get_chromium_encryption_key(local_state_path: &Path) -> Result<Vec<u8>, CookieError> {
+    /// Get the Chromium encryption key for the current platform.
+    fn get_chromium_encryption_key(
+        browser: &DetectedBrowser,
+        _local_state_path: &Path,
+    ) -> Result<Vec<u8>, CookieError> {
+        #[cfg(windows)]
+        {
+            return Self::get_chromium_encryption_key_windows(_local_state_path);
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            return Self::get_chromium_encryption_key_macos(browser.browser_type);
+        }
+
+        #[cfg(not(any(windows, target_os = "macos")))]
+        {
+            let _ = browser;
+            let _ = _local_state_path;
+            Err(CookieError::NoEncryptionKey)
+        }
+    }
+
+    #[cfg(windows)]
+    fn get_chromium_encryption_key_windows(
+        local_state_path: &Path,
+    ) -> Result<Vec<u8>, CookieError> {
         let content = Self::read_file_shared(local_state_path)?;
         let json: serde_json::Value =
             serde_json::from_str(&content).map_err(|e| CookieError::Decryption(e.to_string()))?;
@@ -230,6 +265,83 @@ impl CookieExtractor {
 
         // Decrypt with DPAPI
         Self::dpapi_decrypt(encrypted_key)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn get_chromium_encryption_key_macos(
+        browser_type: BrowserType,
+    ) -> Result<Vec<u8>, CookieError> {
+        let passphrase = Self::read_macos_safe_storage_passphrase(browser_type)?;
+        let mut key = [0_u8; 16];
+        pbkdf2_hmac::<Sha1>(passphrase.as_bytes(), b"saltysalt", 1003, &mut key);
+        Ok(key.to_vec())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn read_macos_safe_storage_passphrase(
+        browser_type: BrowserType,
+    ) -> Result<String, CookieError> {
+        for (service, account) in Self::macos_safe_storage_candidates(browser_type) {
+            let mut command = std::process::Command::new("/usr/bin/security");
+            command
+                .arg("find-generic-password")
+                .arg("-w")
+                .arg("-s")
+                .arg(service);
+            if let Some(account) = account {
+                command.arg("-a").arg(account);
+            }
+
+            let output = match command.output() {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+
+            if !output.status.success() {
+                continue;
+            }
+
+            let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !value.is_empty() {
+                return Ok(value);
+            }
+        }
+
+        Err(CookieError::NoEncryptionKey)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn macos_safe_storage_candidates(
+        browser_type: BrowserType,
+    ) -> Vec<(&'static str, Option<&'static str>)> {
+        match browser_type {
+            BrowserType::Chrome => vec![
+                ("Chrome Safe Storage", Some("Chrome")),
+                ("Chrome Safe Storage", None),
+            ],
+            BrowserType::Edge => vec![
+                ("Microsoft Edge Safe Storage", Some("Microsoft Edge")),
+                ("Microsoft Edge Safe Storage", None),
+            ],
+            BrowserType::Brave => vec![
+                ("Brave Safe Storage", Some("Brave")),
+                ("Brave Browser Safe Storage", Some("Brave Browser")),
+                ("Brave Safe Storage", None),
+            ],
+            BrowserType::Arc => vec![
+                ("Arc Safe Storage", Some("Arc")),
+                ("Arc Safe Storage", None),
+            ],
+            BrowserType::Chromium => vec![
+                ("Chromium Safe Storage", Some("Chromium")),
+                ("Chromium Safe Storage", None),
+            ],
+            BrowserType::Cursor => vec![
+                ("Cursor Safe Storage", Some("Cursor")),
+                ("Cursor Safe Storage", None),
+            ],
+            BrowserType::Firefox => Vec::new(),
+        }
     }
 
     /// Decrypt data using Windows DPAPI
@@ -282,9 +394,23 @@ impl CookieExtractor {
     }
 
     /// Decrypt a Chromium cookie value
-    fn decrypt_chromium_cookie(encrypted_value: &[u8], key: &[u8]) -> Result<String, CookieError> {
+    fn decrypt_chromium_cookie(
+        browser: &DetectedBrowser,
+        encrypted_value: &[u8],
+        key: &[u8],
+    ) -> Result<String, CookieError> {
+        let _ = browser;
         if encrypted_value.is_empty() {
             return Ok(String::new());
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if encrypted_value.starts_with(b"v10") || encrypted_value.starts_with(b"v11") {
+                if let Ok(value) = Self::decrypt_chromium_cookie_macos_cbc(encrypted_value, key) {
+                    return Ok(value);
+                }
+            }
         }
 
         // Check for v10/v11 prefix (AES-256-GCM)
@@ -367,6 +493,48 @@ impl CookieExtractor {
             let decrypted = Self::dpapi_decrypt(encrypted_value)?;
             String::from_utf8(decrypted).map_err(|e| CookieError::Decryption(e.to_string()))
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn decrypt_chromium_cookie_macos_cbc(
+        encrypted_value: &[u8],
+        key: &[u8],
+    ) -> Result<String, CookieError> {
+        if encrypted_value.len() <= 3 {
+            return Err(CookieError::Decryption(
+                "Invalid macOS Chromium cookie payload".to_string(),
+            ));
+        }
+        if key.len() != 16 {
+            return Err(CookieError::Decryption(format!(
+                "Unexpected macOS Chromium key length: {}",
+                key.len()
+            )));
+        }
+
+        type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
+
+        let iv = [b' '; 16];
+        let mut ciphertext = encrypted_value[3..].to_vec();
+        let decryptor = Aes128CbcDec::new_from_slices(key, &iv)
+            .map_err(|err| CookieError::Decryption(format!("AES-CBC init failed: {err}")))?;
+        let plaintext = decryptor
+            .decrypt_padded_mut::<Pkcs7>(&mut ciphertext)
+            .map_err(|err| CookieError::Decryption(format!("AES-CBC decrypt failed: {err}")))?;
+
+        if let Ok(value) = String::from_utf8(plaintext.to_vec()) {
+            return Ok(value);
+        }
+
+        if plaintext.len() > 32 {
+            if let Ok(value) = String::from_utf8(plaintext[32..].to_vec()) {
+                return Ok(value);
+            }
+        }
+
+        Err(CookieError::Decryption(
+            "Unable to decode macOS Chromium cookie plaintext".to_string(),
+        ))
     }
 
     /// Extract cookies from Firefox
@@ -630,5 +798,19 @@ mod tests {
                 println!("Could not get cookies: {}", e);
             }
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_safe_storage_candidates_exist_for_chromium_browsers() {
+        let chrome = CookieExtractor::macos_safe_storage_candidates(BrowserType::Chrome);
+        let edge = CookieExtractor::macos_safe_storage_candidates(BrowserType::Edge);
+        let brave = CookieExtractor::macos_safe_storage_candidates(BrowserType::Brave);
+        let cursor = CookieExtractor::macos_safe_storage_candidates(BrowserType::Cursor);
+
+        assert!(!chrome.is_empty());
+        assert!(!edge.is_empty());
+        assert!(!brave.is_empty());
+        assert!(!cursor.is_empty());
     }
 }

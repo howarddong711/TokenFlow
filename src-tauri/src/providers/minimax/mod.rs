@@ -47,16 +47,16 @@ impl MiniMaxProvider {
         }
     }
 
-    /// Get MiniMax config directory
-    fn get_minimax_config_path() -> Option<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            dirs::config_dir().map(|p| p.join("minimax"))
+    /// Candidate MiniMax config directories for the current platform.
+    fn get_minimax_config_paths() -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        if let Some(config) = dirs::config_dir() {
+            paths.push(config.join("minimax"));
         }
-        #[cfg(not(target_os = "windows"))]
-        {
-            dirs::home_dir().map(|p| p.join(".minimax"))
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join(".minimax"));
         }
+        paths
     }
 
     /// Read MiniMax API key
@@ -69,31 +69,30 @@ impl MiniMaxProvider {
             return Ok((group_id, api_key));
         }
 
-        // Check config file
-        let config_path = Self::get_minimax_config_path()
-            .ok_or_else(|| ProviderError::NotInstalled("MiniMax config not found".to_string()))?;
+        // Check local config files
+        for config_path in Self::get_minimax_config_paths() {
+            let config_file = config_path.join("config.json");
+            if config_file.exists() {
+                let content = tokio::fs::read_to_string(&config_file)
+                    .await
+                    .map_err(|e| ProviderError::Other(e.to_string()))?;
 
-        let config_file = config_path.join("config.json");
-        if config_file.exists() {
-            let content = tokio::fs::read_to_string(&config_file)
-                .await
-                .map_err(|e| ProviderError::Other(e.to_string()))?;
+                let json: serde_json::Value = serde_json::from_str(&content)
+                    .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
-            let json: serde_json::Value =
-                serde_json::from_str(&content).map_err(|e| ProviderError::Parse(e.to_string()))?;
+                let group_id = json
+                    .get("group_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
-            let group_id = json
-                .get("group_id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                let api_key = json
+                    .get("api_key")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
 
-            let api_key = json
-                .get("api_key")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-
-            if let (Some(gid), Some(key)) = (group_id, api_key) {
-                return Ok((gid, key));
+                if let (Some(gid), Some(key)) = (group_id, api_key) {
+                    return Ok((gid, key));
+                }
             }
         }
 
@@ -225,9 +224,9 @@ impl MiniMaxProvider {
     async fn probe_cli(&self) -> Result<UsageSnapshot, ProviderError> {
         // Check if API key is configured
         let has_env_vars = std::env::var("MINIMAX_API_KEY").is_ok();
-        let has_config = Self::get_minimax_config_path()
-            .map(|p| p.join("config.json").exists())
-            .unwrap_or(false);
+        let has_config = Self::get_minimax_config_paths()
+            .iter()
+            .any(|path| path.join("config.json").exists());
 
         if has_env_vars || has_config {
             let usage =

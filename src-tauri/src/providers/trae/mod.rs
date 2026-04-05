@@ -119,10 +119,7 @@ impl TraeProvider {
         let response = self
             .client
             .post(endpoint)
-            .header(
-                USER_AGENT,
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
+            .header(USER_AGENT, "Mozilla/5.0")
             .header(
                 AUTHORIZATION,
                 format!("Cloud-IDE-JWT {}", session.access_token),
@@ -188,8 +185,12 @@ impl Provider for TraeProvider {
             .ok_or_else(|| ProviderError::Parse("Trae quota payload missing".to_string()))?;
         let usage = entitlement.usage.as_ref();
         let resets_at = base.end_time.and_then(timestamp_to_datetime);
-        let (primary, extra_windows) = build_trae_windows(usage, quota, resets_at)
-            .ok_or_else(|| ProviderError::Parse("Trae quota payload did not contain any usable windows".to_string()))?;
+        let (primary, extra_windows) =
+            build_trae_windows(usage, quota, resets_at).ok_or_else(|| {
+                ProviderError::Parse(
+                    "Trae quota payload did not contain any usable windows".to_string(),
+                )
+            })?;
 
         let mut snapshot = UsageSnapshot::new(primary)
             .with_login_method(plan_label(base.product_type))
@@ -301,7 +302,9 @@ fn build_trae_windows(
     let mut windows = Vec::new();
 
     if let Some(window) = quota_window(
-        usage.map(|value| normalize_trae_usage(value.advanced_model_amount)).unwrap_or(0),
+        usage
+            .map(|value| normalize_trae_usage(value.advanced_model_amount))
+            .unwrap_or(0),
         normalize_trae_limit(quota.advanced_model_request_limit).unwrap_or(0),
         resets_at,
     ) {
@@ -312,7 +315,9 @@ fn build_trae_windows(
     }
 
     if let Some(window) = quota_window(
-        usage.map(|value| normalize_trae_usage(value.auto_completion_amount)).unwrap_or(0),
+        usage
+            .map(|value| normalize_trae_usage(value.auto_completion_amount))
+            .unwrap_or(0),
         normalize_trae_limit(quota.auto_completion_limit).unwrap_or(0),
         resets_at,
     ) {
@@ -323,7 +328,9 @@ fn build_trae_windows(
     }
 
     if let Some(window) = quota_window(
-        usage.map(|value| normalize_trae_usage(value.premium_model_fast_amount)).unwrap_or(0),
+        usage
+            .map(|value| normalize_trae_usage(value.premium_model_fast_amount))
+            .unwrap_or(0),
         normalize_trae_limit(quota.premium_model_fast_request_limit).unwrap_or(0),
         resets_at,
     ) {
@@ -333,7 +340,9 @@ fn build_trae_windows(
     }
 
     if let Some(window) = quota_window(
-        usage.map(|value| normalize_trae_usage(value.premium_model_slow_amount)).unwrap_or(0),
+        usage
+            .map(|value| normalize_trae_usage(value.premium_model_slow_amount))
+            .unwrap_or(0),
         normalize_trae_limit(quota.premium_model_slow_request_limit).unwrap_or(0),
         resets_at,
     ) {

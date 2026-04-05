@@ -26,6 +26,7 @@ interface SettingsPageProps {
   minimizeToTray: boolean;
   launchOnStartup: boolean;
   autoUpdate: boolean;
+  autoUpdateSupported: boolean;
   providerColors: Record<ProviderId, string>;
   onThemeChange: (theme: WorkspaceTheme) => void;
   onPrivacyModeChange: (enabled: boolean) => void;
@@ -47,6 +48,7 @@ export function SettingsPage({
   minimizeToTray,
   launchOnStartup,
   autoUpdate,
+  autoUpdateSupported,
   providerColors,
   onThemeChange,
   onPrivacyModeChange,
@@ -89,8 +91,15 @@ export function SettingsPage({
           <ToggleTile
             icon={<Download className="size-4" />}
             label={copy.settings.autoUpdate}
-            value={autoUpdate ? copy.settings.enabled : copy.settings.disabled}
+            value={
+              autoUpdateSupported
+                ? autoUpdate
+                  ? copy.settings.enabled
+                  : copy.settings.disabled
+                : copy.settings.unavailable
+            }
             checked={autoUpdate}
+            disabled={!autoUpdateSupported}
             onChange={onAutoUpdateChange}
           />
         </CardContent>

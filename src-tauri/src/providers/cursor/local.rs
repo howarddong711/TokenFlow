@@ -1,9 +1,8 @@
-use std::path::PathBuf;
-
 use rusqlite::Connection;
 use serde::Serialize;
 
 use crate::core::{ProviderError, ProviderFetchResult, RateWindow, UsageSnapshot};
+use crate::platform;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CursorLocalSession {
@@ -12,7 +11,7 @@ pub struct CursorLocalSession {
 }
 
 pub fn detect_local_session() -> Result<Option<CursorLocalSession>, ProviderError> {
-    let db_path = local_state_db_path().ok_or_else(|| {
+    let db_path = platform::cursor_state_db_path().ok_or_else(|| {
         ProviderError::Other("Failed to resolve Cursor local session database".to_string())
     })?;
 
@@ -53,16 +52,6 @@ pub fn build_local_fetch_result(session: &CursorLocalSession) -> ProviderFetchRe
     }
 
     ProviderFetchResult::new(usage, "local")
-}
-
-fn local_state_db_path() -> Option<PathBuf> {
-    let base = dirs::data_dir()?;
-    Some(
-        base.join("Cursor")
-            .join("User")
-            .join("globalStorage")
-            .join("state.vscdb"),
-    )
 }
 
 fn get_value(conn: &Connection, key: &str) -> Result<Option<String>, rusqlite::Error> {

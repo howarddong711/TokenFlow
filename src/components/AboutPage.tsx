@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { openInBrowser } from "@/services/browser";
 import { useI18n } from "@/i18n";
 import { getWorkspaceCopy } from "@/i18n/workspaceCopy";
-import type { AppUpdaterState } from "@/hooks";
+import type { AppUpdatePolicy, AppUpdaterState } from "@/hooks";
 import appLogo from "../../src-tauri/icons/128x128.png";
 
 interface AboutPageProps {
@@ -12,6 +12,7 @@ interface AboutPageProps {
   projectUrl?: string;
   donateUrl?: string;
   autoUpdateEnabled: boolean;
+  updatePolicy: AppUpdatePolicy;
   updateState: AppUpdaterState;
   onCheckUpdates: () => Promise<void>;
   onInstallUpdate: () => Promise<void>;
@@ -22,16 +23,18 @@ export function AboutPage({
   projectUrl = "https://github.com/howarddong711/TokenFlow#",
   donateUrl,
   autoUpdateEnabled,
+  updatePolicy,
   updateState,
   onCheckUpdates,
   onInstallUpdate,
 }: AboutPageProps) {
   const { lang } = useI18n();
   const copy = getWorkspaceCopy(lang);
+  const updatesDisabled = !updatePolicy.inAppUpdatesEnabled;
   const isChecking = updateState.phase === "checking";
   const isInstalling = updateState.phase === "installing";
-  const canInstall = updateState.phase === "available";
-  const updateSummary = getUpdateSummary(copy, updateState);
+  const canInstall = updateState.phase === "available" && !updatesDisabled;
+  const updateSummary = getUpdateSummary(copy, updateState, updatePolicy);
 
   return (
     <div className="flex justify-center px-2 pb-6 pt-2">
@@ -56,7 +59,11 @@ export function AboutPage({
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button variant="default" onClick={() => void onCheckUpdates()} disabled={isChecking || isInstalling}>
+            <Button
+              variant="default"
+              onClick={() => void onCheckUpdates()}
+              disabled={isChecking || isInstalling || updatesDisabled}
+            >
               {isChecking || isInstalling ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -122,8 +129,16 @@ export function AboutPage({
 
 function getUpdateSummary(
   copy: ReturnType<typeof getWorkspaceCopy>,
-  updateState: AppUpdaterState
+  updateState: AppUpdaterState,
+  updatePolicy: AppUpdatePolicy
 ) {
+  if (!updatePolicy.inAppUpdatesEnabled) {
+    if (updatePolicy.channel === "mac_app_store") {
+      return copy.about.updateManagedByStore;
+    }
+    return copy.about.updateDisabledByChannel(updatePolicy.channel);
+  }
+
   switch (updateState.phase) {
     case "checking":
       return copy.about.updateChecking;

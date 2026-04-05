@@ -1,6 +1,7 @@
 use serde::Serialize;
 
-use crate::browser::cookies::{get_all_cookie_headers_by_profile, BrowserCookieSet};
+use crate::browser::cookies::BrowserCookieSet;
+use crate::platform::extract_browser_cookie_sets;
 use crate::providers::cursor::{detect_local_session, CursorApi};
 
 const CURSOR_COOKIE_DOMAINS: [&str; 2] = ["cursor.com", "cursor.sh"];
@@ -30,7 +31,7 @@ pub struct CursorLocalSessionImport {
 pub async fn list_cursor_browser_profiles() -> Result<Vec<CursorBrowserProfileCandidate>, String> {
     let cookie_sets: Vec<BrowserCookieSet> = CURSOR_COOKIE_DOMAINS
         .iter()
-        .flat_map(|domain| get_all_cookie_headers_by_profile(domain))
+        .flat_map(|domain| extract_browser_cookie_sets(domain))
         .collect();
     let api = CursorApi::new();
     let mut candidates = Vec::new();
@@ -53,7 +54,7 @@ pub async fn import_cursor_browser_profile(
     let target = browser_label.trim().to_lowercase();
     let cookie_set = CURSOR_COOKIE_DOMAINS
         .iter()
-        .flat_map(|domain| get_all_cookie_headers_by_profile(domain))
+        .flat_map(|domain| extract_browser_cookie_sets(domain))
         .find(|candidate| candidate.browser_label.trim().to_lowercase() == target)
         .ok_or_else(|| format!("Cursor browser profile not found: {browser_label}"))?;
 

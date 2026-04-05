@@ -294,17 +294,44 @@ impl ClaudeProvider {
 
 /// Try to find the claude CLI binary
 fn which_claude() -> Option<std::path::PathBuf> {
-    // Check common locations on Windows
-    let possible_paths = [
-        // In PATH
-        which::which("claude").ok(),
-        // AppData locations
-        dirs::data_local_dir().map(|p| p.join("Programs").join("claude").join("claude.exe")),
-        // npm global install
-        dirs::data_dir().map(|p| p.join("npm").join("claude.cmd")),
-    ];
+    if let Ok(path) = which::which("claude") {
+        return Some(path);
+    }
 
-    possible_paths.into_iter().flatten().find(|p| p.exists())
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(path) =
+            dirs::data_local_dir().map(|p| p.join("Programs").join("claude").join("claude.exe"))
+        {
+            candidates.push(path);
+        }
+        if let Some(path) = dirs::data_dir().map(|p| p.join("npm").join("claude.cmd")) {
+            candidates.push(path);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(std::path::PathBuf::from("/opt/homebrew/bin/claude"));
+        candidates.push(std::path::PathBuf::from("/usr/local/bin/claude"));
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join(".npm-global").join("bin").join("claude"));
+            candidates.push(home.join(".local").join("bin").join("claude"));
+        }
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        candidates.push(std::path::PathBuf::from("/usr/local/bin/claude"));
+        candidates.push(std::path::PathBuf::from("/usr/bin/claude"));
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join(".local").join("bin").join("claude"));
+        }
+    }
+
+    candidates.into_iter().find(|path| path.exists())
 }
 
 /// Detect the version of the claude CLI

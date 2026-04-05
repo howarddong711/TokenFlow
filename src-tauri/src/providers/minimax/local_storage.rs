@@ -106,10 +106,10 @@ impl MiniMaxLocalStorageImporter {
         #[cfg(target_os = "macos")]
         {
             if let Some(home) = dirs::home_dir() {
+                let app_support = home.join("Library").join("Application Support");
+
                 // Chrome
-                let chrome_path = home
-                    .join("Library")
-                    .join("Application Support")
+                let chrome_path = app_support
                     .join("Google")
                     .join("Chrome")
                     .join("Default")
@@ -120,15 +120,35 @@ impl MiniMaxLocalStorageImporter {
                 }
 
                 // Edge
-                let edge_path = home
-                    .join("Library")
-                    .join("Application Support")
+                let edge_path = app_support
                     .join("Microsoft Edge")
                     .join("Default")
                     .join("Local Storage")
                     .join("leveldb");
                 if edge_path.exists() {
                     paths.push(("Edge".to_string(), edge_path));
+                }
+
+                // Brave
+                let brave_path = app_support
+                    .join("BraveSoftware")
+                    .join("Brave-Browser")
+                    .join("Default")
+                    .join("Local Storage")
+                    .join("leveldb");
+                if brave_path.exists() {
+                    paths.push(("Brave".to_string(), brave_path));
+                }
+
+                // Arc
+                let arc_path = app_support
+                    .join("Arc")
+                    .join("User Data")
+                    .join("Default")
+                    .join("Local Storage")
+                    .join("leveldb");
+                if arc_path.exists() {
+                    paths.push(("Arc".to_string(), arc_path));
                 }
             }
         }

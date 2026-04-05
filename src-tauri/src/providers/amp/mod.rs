@@ -34,28 +34,32 @@ impl AmpProvider {
         }
     }
 
-    /// Get Amp config directory
-    fn get_amp_config_path() -> Option<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            dirs::config_dir().map(|p| p.join("amp"))
+    /// Candidate Amp config directories for the current platform.
+    fn get_amp_config_paths() -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+
+        if let Some(config) = dirs::config_dir() {
+            paths.push(config.join("amp"));
         }
-        #[cfg(not(target_os = "windows"))]
-        {
-            dirs::home_dir().map(|p| p.join(".amp"))
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join(".amp"));
         }
+
+        paths
     }
 
-    /// Get Sourcegraph/Cody config directory (Amp might use this)
-    fn get_cody_config_path() -> Option<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            dirs::config_dir().map(|p| p.join("sourcegraph-cody"))
+    /// Candidate Sourcegraph/Cody config directories (Amp may reuse these).
+    fn get_cody_config_paths() -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+
+        if let Some(config) = dirs::config_dir() {
+            paths.push(config.join("sourcegraph-cody"));
         }
-        #[cfg(not(target_os = "windows"))]
-        {
-            dirs::home_dir().map(|p| p.join(".sourcegraph"))
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join(".sourcegraph"));
         }
+
+        paths
     }
 
     /// Read Amp/Sourcegraph access token
@@ -76,7 +80,7 @@ impl AmpProvider {
         }
 
         // Check Amp config
-        if let Some(amp_path) = Self::get_amp_config_path() {
+        for amp_path in Self::get_amp_config_paths() {
             let config_file = amp_path.join("config.json");
             if config_file.exists() {
                 if let Ok(content) = tokio::fs::read_to_string(&config_file).await {
@@ -90,7 +94,7 @@ impl AmpProvider {
         }
 
         // Check Cody/Sourcegraph config
-        if let Some(cody_path) = Self::get_cody_config_path() {
+        for cody_path in Self::get_cody_config_paths() {
             let config_file = cody_path.join("config.json");
             if config_file.exists() {
                 if let Ok(content) = tokio::fs::read_to_string(&config_file).await {
@@ -183,13 +187,13 @@ impl AmpProvider {
         let has_env =
             std::env::var("SRC_ACCESS_TOKEN").is_ok() || std::env::var("AMP_ACCESS_TOKEN").is_ok();
 
-        let has_amp_config = Self::get_amp_config_path()
-            .map(|p| p.join("config.json").exists())
-            .unwrap_or(false);
+        let has_amp_config = Self::get_amp_config_paths()
+            .iter()
+            .any(|path| path.join("config.json").exists());
 
-        let has_cody_config = Self::get_cody_config_path()
-            .map(|p| p.join("config.json").exists())
-            .unwrap_or(false);
+        let has_cody_config = Self::get_cody_config_paths()
+            .iter()
+            .any(|path| path.join("config.json").exists());
 
         if has_api_key || has_env || has_amp_config || has_cody_config {
             let usage =

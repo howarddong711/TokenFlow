@@ -34,16 +34,16 @@ impl SyntheticProvider {
         }
     }
 
-    /// Get Synthetic config directory
-    fn get_synthetic_config_path() -> Option<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            dirs::config_dir().map(|p| p.join("synthetic"))
+    /// Candidate Synthetic config directories for the current platform.
+    fn get_synthetic_config_paths() -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        if let Some(config) = dirs::config_dir() {
+            paths.push(config.join("synthetic"));
         }
-        #[cfg(not(target_os = "windows"))]
-        {
-            dirs::home_dir().map(|p| p.join(".synthetic"))
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join(".synthetic"));
         }
+        paths
     }
 
     /// Read Synthetic access token
@@ -63,8 +63,8 @@ impl SyntheticProvider {
             return Ok(token);
         }
 
-        // Check config file
-        if let Some(config_path) = Self::get_synthetic_config_path() {
+        // Check config files
+        for config_path in Self::get_synthetic_config_paths() {
             let config_file = config_path.join("config.json");
             if config_file.exists() {
                 if let Ok(content) = tokio::fs::read_to_string(&config_file).await {
@@ -80,7 +80,7 @@ impl SyntheticProvider {
                 }
             }
 
-            // Also check credentials.json
+            // Also check credentials.json in the same config directory
             let creds_file = config_path.join("credentials.json");
             if creds_file.exists() {
                 if let Ok(content) = tokio::fs::read_to_string(&creds_file).await {
@@ -181,9 +181,9 @@ impl SyntheticProvider {
         let has_env = std::env::var("SYNTHETIC_API_KEY").is_ok()
             || std::env::var("SYNTHETIC_ACCESS_TOKEN").is_ok();
 
-        let has_config = Self::get_synthetic_config_path()
-            .map(|p| p.join("config.json").exists() || p.join("credentials.json").exists())
-            .unwrap_or(false);
+        let has_config = Self::get_synthetic_config_paths().iter().any(|path| {
+            path.join("config.json").exists() || path.join("credentials.json").exists()
+        });
 
         if has_api_key || has_env || has_config {
             let usage = UsageSnapshot::new(RateWindow::new(0.0))

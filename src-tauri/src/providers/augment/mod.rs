@@ -40,16 +40,17 @@ impl AugmentProvider {
         }
     }
 
-    /// Get Augment config directory
-    fn get_augment_config_path() -> Option<PathBuf> {
-        #[cfg(target_os = "windows")]
-        {
-            dirs::config_dir().map(|p| p.join("augment"))
+    /// Candidate Augment config directories for the current platform.
+    fn get_augment_config_paths() -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        if let Some(config) = dirs::config_dir() {
+            paths.push(config.join("augment"));
+            paths.push(config.join("Augment"));
         }
-        #[cfg(not(target_os = "windows"))]
-        {
-            dirs::home_dir().map(|p| p.join(".augment"))
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join(".augment"));
         }
+        paths
     }
 
     /// Find Augment CLI
@@ -67,21 +68,20 @@ impl AugmentProvider {
 
     /// Read Augment auth token
     async fn read_auth_token(&self) -> Result<String, ProviderError> {
-        let config_path = Self::get_augment_config_path()
-            .ok_or_else(|| ProviderError::NotInstalled("Augment config not found".to_string()))?;
-
         // Check for token file
-        let token_file = config_path.join("auth.json");
-        if token_file.exists() {
-            let content = tokio::fs::read_to_string(&token_file)
-                .await
-                .map_err(|e| ProviderError::Other(e.to_string()))?;
+        for config_path in Self::get_augment_config_paths() {
+            let token_file = config_path.join("auth.json");
+            if token_file.exists() {
+                let content = tokio::fs::read_to_string(&token_file)
+                    .await
+                    .map_err(|e| ProviderError::Other(e.to_string()))?;
 
-            let json: serde_json::Value =
-                serde_json::from_str(&content).map_err(|e| ProviderError::Parse(e.to_string()))?;
+                let json: serde_json::Value = serde_json::from_str(&content)
+                    .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
-            if let Some(token) = json.get("access_token").and_then(|v| v.as_str()) {
-                return Ok(token.to_string());
+                if let Some(token) = json.get("access_token").and_then(|v| v.as_str()) {
+                    return Ok(token.to_string());
+                }
             }
         }
 
@@ -95,29 +95,27 @@ impl AugmentProvider {
     }
 
     async fn get_vscode_augment_settings() -> Option<String> {
-        #[cfg(target_os = "windows")]
-        let settings_path = dirs::config_dir().map(|p| {
-            p.join("Code")
-                .join("User")
-                .join("globalStorage")
-                .join("augment.augment-vscode")
-                .join("auth.json")
-        });
-        #[cfg(not(target_os = "windows"))]
-        let settings_path = dirs::config_dir().map(|p| {
-            p.join("Code")
-                .join("User")
-                .join("globalStorage")
-                .join("augment.augment-vscode")
-                .join("auth.json")
-        });
+        if let Some(base) = dirs::config_dir() {
+            let settings_paths = [
+                base.join("Code")
+                    .join("User")
+                    .join("globalStorage")
+                    .join("augment.augment-vscode")
+                    .join("auth.json"),
+                base.join("Code - Insiders")
+                    .join("User")
+                    .join("globalStorage")
+                    .join("augment.augment-vscode")
+                    .join("auth.json"),
+            ];
 
-        if let Some(path) = settings_path {
-            if path.exists() {
-                if let Ok(content) = tokio::fs::read_to_string(&path).await {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                        if let Some(token) = json.get("accessToken").and_then(|v| v.as_str()) {
-                            return Some(token.to_string());
+            for path in settings_paths {
+                if path.exists() {
+                    if let Ok(content) = tokio::fs::read_to_string(&path).await {
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if let Some(token) = json.get("accessToken").and_then(|v| v.as_str()) {
+                                return Some(token.to_string());
+                            }
                         }
                     }
                 }
@@ -200,11 +198,11 @@ impl AugmentProvider {
     async fn probe_cli(&self) -> Result<UsageSnapshot, ProviderError> {
         // Check if Augment is installed (VS Code extension or CLI)
         let augment_path = Self::which_augment();
-        let config_path = Self::get_augment_config_path();
+        let has_config = Self::get_augment_config_paths()
+            .iter()
+            .any(|path| path.exists());
 
-        if augment_path.map(|p| p.exists()).unwrap_or(false)
-            || config_path.map(|p| p.exists()).unwrap_or(false)
-        {
+        if augment_path.map(|p| p.exists()).unwrap_or(false) || has_config {
             let usage =
                 UsageSnapshot::new(RateWindow::new(0.0)).with_login_method("Augment (installed)");
             Ok(usage)

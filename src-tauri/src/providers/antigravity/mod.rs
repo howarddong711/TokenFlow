@@ -972,8 +972,7 @@ impl AntigravityProvider {
         if let Some(model_specific) = model_specific {
             usage = usage.with_model_specific(model_specific);
         }
-        if let Some(login_method) = login_method.or_else(|| Some("Free".to_string()))
-        {
+        if let Some(login_method) = login_method.or_else(|| Some("Free".to_string())) {
             usage = usage.with_login_method(login_method);
         }
 
@@ -1140,14 +1139,26 @@ impl Provider for AntigravityProvider {
                     if matches!(ctx.source_mode, SourceMode::Cli) {
                         return Err(err);
                     }
+                    #[cfg(not(windows))]
+                    {
+                        return Err(err);
+                    }
                 }
             }
         }
 
-        tracing::debug!("Fetching Anti-Gravity usage via local probe fallback");
-        match self.fetch_user_status().await {
-            Ok(usage) => Ok(ProviderFetchResult::new(usage, "local")),
-            Err(e) => Err(e),
+        #[cfg(not(windows))]
+        {
+            return Err(ProviderError::AuthRequired);
+        }
+
+        #[cfg(windows)]
+        {
+            tracing::debug!("Fetching Anti-Gravity usage via local probe fallback");
+            match self.fetch_user_status().await {
+                Ok(usage) => Ok(ProviderFetchResult::new(usage, "local")),
+                Err(e) => Err(e),
+            }
         }
     }
 

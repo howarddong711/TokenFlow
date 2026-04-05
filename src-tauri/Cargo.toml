@@ -1,7 +1,7 @@
 [package]
 name = "tokenflow"
-version = "0.1.4"
-description = "Windows desktop dashboard for AI coding accounts, token usage, and provider-native quota windows"
+version = "0.1.5"
+description = "Windows and macOS desktop dashboard for AI coding accounts, token usage, and provider-native quota windows"
 authors = ["Howard Dong"]
 license = "MIT"
 edition = "2021"
@@ -43,7 +43,7 @@ regex-lite = "0.1"
 which = "7"
 open = "5"
 uuid = { version = "1", features = ["v4", "serde"] }
-keyring = { version = "3", features = ["windows-native"] }
+keyring = { version = "3" }
 url = "2"
 jsonwebtoken = "9"
 
@@ -55,6 +55,10 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 
 # Encryption for cookie decryption (Chrome/Edge DPAPI + AES-GCM)
 aes-gcm = "0.10"
+aes = "0.8"
+cbc = "0.1"
+pbkdf2 = "0.12"
+sha1 = "0.10"
 
 # Windows-specific dependencies
 [target.'cfg(windows)'.dependencies]

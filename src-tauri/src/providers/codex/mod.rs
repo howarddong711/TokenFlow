@@ -99,17 +99,44 @@ impl Provider for CodexProvider {
 
 /// Try to find the codex CLI binary
 fn which_codex() -> Option<std::path::PathBuf> {
-    // Check common locations on Windows
-    let possible_paths = [
-        // In PATH
-        which::which("codex").ok(),
-        // npm global install
-        dirs::data_dir().map(|p| p.join("npm").join("codex.cmd")),
-        // AppData locations
-        dirs::data_local_dir().map(|p| p.join("Programs").join("codex").join("codex.exe")),
-    ];
+    if let Ok(path) = which::which("codex") {
+        return Some(path);
+    }
 
-    possible_paths.into_iter().flatten().find(|p| p.exists())
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(path) = dirs::data_dir().map(|p| p.join("npm").join("codex.cmd")) {
+            candidates.push(path);
+        }
+        if let Some(path) =
+            dirs::data_local_dir().map(|p| p.join("Programs").join("codex").join("codex.exe"))
+        {
+            candidates.push(path);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(std::path::PathBuf::from("/opt/homebrew/bin/codex"));
+        candidates.push(std::path::PathBuf::from("/usr/local/bin/codex"));
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join(".npm-global").join("bin").join("codex"));
+            candidates.push(home.join(".local").join("bin").join("codex"));
+        }
+    }
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        candidates.push(std::path::PathBuf::from("/usr/local/bin/codex"));
+        candidates.push(std::path::PathBuf::from("/usr/bin/codex"));
+        if let Some(home) = dirs::home_dir() {
+            candidates.push(home.join(".local").join("bin").join("codex"));
+        }
+    }
+
+    candidates.into_iter().find(|path| path.exists())
 }
 
 /// Detect the version of the codex CLI

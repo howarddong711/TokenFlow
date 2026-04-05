@@ -60,7 +60,7 @@ import { cn } from "@/lib/utils";
 import type { ProviderAccount, ProviderId, ProviderUsageWindow, TokenQuota } from "@/types";
 import { PROVIDERS } from "@/types";
 
-const APP_VERSION = "0.1.4";
+const APP_VERSION = "0.1.5";
 type RequestStatusFilter = "all" | `${number}`;
 const DASHBOARD_CHART_LAYOUT = {
   sectionGap: 8,
@@ -524,6 +524,7 @@ export function Dashboard() {
               minimizeToTray={preferences.minimizeToTray}
               launchOnStartup={preferences.launchOnStartup}
               autoUpdate={preferences.autoUpdate}
+              autoUpdateSupported={appUpdater.policy.inAppUpdatesEnabled}
               providerColors={preferences.providerColors}
               onThemeChange={preferenceActions.setTheme}
               onPrivacyModeChange={preferenceActions.setPrivacyMode}
@@ -539,6 +540,7 @@ export function Dashboard() {
             <AboutPage
               version={APP_VERSION}
               autoUpdateEnabled={preferences.autoUpdate}
+              updatePolicy={appUpdater.policy}
               updateState={appUpdater.state}
               onCheckUpdates={appUpdater.checkForUpdates}
               onInstallUpdate={appUpdater.installUpdate}
@@ -2244,4 +2246,3 @@ function formatTrackingSource(
 
   return copy.logs.trackingSourceLocal;
 }
-

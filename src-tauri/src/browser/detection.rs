@@ -1,4 +1,4 @@
-//! Browser detection for Windows
+//! Browser detection for desktop platforms
 //! Finds installed browsers and their profile locations
 
 #![allow(dead_code)]
@@ -78,7 +78,7 @@ impl BrowserProfile {
     }
 }
 
-/// Browser detector for Windows
+/// Browser detector
 pub struct BrowserDetector;
 
 impl BrowserDetector {
@@ -118,29 +118,70 @@ impl BrowserDetector {
 
     /// Get the user data directory for a browser
     fn get_user_data_dir(browser_type: BrowserType) -> Option<PathBuf> {
-        let local_app_data = dirs::data_local_dir()?;
-        let app_data = dirs::data_dir()?;
+        #[cfg(target_os = "windows")]
+        {
+            let local_app_data = dirs::data_local_dir()?;
+            let app_data = dirs::data_dir()?;
 
-        let path = match browser_type {
-            BrowserType::Chrome => local_app_data
-                .join("Google")
-                .join("Chrome")
-                .join("User Data"),
-            BrowserType::Edge => local_app_data
-                .join("Microsoft")
-                .join("Edge")
-                .join("User Data"),
-            BrowserType::Brave => local_app_data
-                .join("BraveSoftware")
-                .join("Brave-Browser")
-                .join("User Data"),
-            BrowserType::Arc => local_app_data.join("Arc").join("User Data"),
-            BrowserType::Cursor => app_data.join("Cursor"),
-            BrowserType::Chromium => local_app_data.join("Chromium").join("User Data"),
-            BrowserType::Firefox => app_data.join("Mozilla").join("Firefox").join("Profiles"),
-        };
+            let path = match browser_type {
+                BrowserType::Chrome => local_app_data
+                    .join("Google")
+                    .join("Chrome")
+                    .join("User Data"),
+                BrowserType::Edge => local_app_data
+                    .join("Microsoft")
+                    .join("Edge")
+                    .join("User Data"),
+                BrowserType::Brave => local_app_data
+                    .join("BraveSoftware")
+                    .join("Brave-Browser")
+                    .join("User Data"),
+                BrowserType::Arc => local_app_data.join("Arc").join("User Data"),
+                BrowserType::Cursor => app_data.join("Cursor"),
+                BrowserType::Chromium => local_app_data.join("Chromium").join("User Data"),
+                BrowserType::Firefox => app_data.join("Mozilla").join("Firefox").join("Profiles"),
+            };
 
-        Some(path)
+            return Some(path);
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let home = dirs::home_dir()?;
+            let app_support = home.join("Library").join("Application Support");
+
+            let path = match browser_type {
+                BrowserType::Chrome => app_support.join("Google").join("Chrome"),
+                BrowserType::Edge => app_support.join("Microsoft Edge"),
+                BrowserType::Brave => app_support.join("BraveSoftware").join("Brave-Browser"),
+                BrowserType::Arc => app_support.join("Arc").join("User Data"),
+                BrowserType::Cursor => app_support.join("Cursor"),
+                BrowserType::Chromium => app_support.join("Chromium"),
+                BrowserType::Firefox => app_support.join("Firefox").join("Profiles"),
+            };
+
+            return Some(path);
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        {
+            let home = dirs::home_dir()?;
+
+            let path = match browser_type {
+                BrowserType::Chrome => home.join(".config").join("google-chrome"),
+                BrowserType::Edge => home.join(".config").join("microsoft-edge"),
+                BrowserType::Brave => home
+                    .join(".config")
+                    .join("BraveSoftware")
+                    .join("Brave-Browser"),
+                BrowserType::Arc => home.join(".config").join("Arc"),
+                BrowserType::Cursor => home.join(".config").join("Cursor"),
+                BrowserType::Chromium => home.join(".config").join("chromium"),
+                BrowserType::Firefox => home.join(".mozilla").join("firefox"),
+            };
+
+            Some(path)
+        }
     }
 
     /// Detect profiles within a browser's user data directory

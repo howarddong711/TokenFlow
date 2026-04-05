@@ -2,6 +2,7 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use reqwest::Client;
 use rusqlite::Connection;
+#[cfg(windows)]
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -356,9 +357,20 @@ fn antigravity_client_secret() -> Result<String, String> {
 }
 
 fn antigravity_state_db_path() -> Result<std::path::PathBuf, String> {
-    let appdata =
-        env::var("APPDATA").map_err(|_| "Could not resolve APPDATA for Anti-Gravity".to_string())?;
-    let path = std::path::PathBuf::from(appdata)
+    #[cfg(windows)]
+    let base = env::var("APPDATA")
+        .map(std::path::PathBuf::from)
+        .map_err(|_| "Could not resolve APPDATA for Anti-Gravity".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    let base = dirs::data_dir()
+        .ok_or_else(|| "Could not resolve Application Support for Anti-Gravity".to_string())?;
+
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    let base = dirs::data_dir()
+        .ok_or_else(|| "Could not resolve local data directory for Anti-Gravity".to_string())?;
+
+    let path = base
         .join("Antigravity")
         .join("User")
         .join("globalStorage")
@@ -385,7 +397,8 @@ fn extract_json_from_embedded_base64(raw: &str) -> Option<String> {
                     let candidate = &raw[chunk_start..index];
                     if let Ok(decoded) = STANDARD.decode(candidate) {
                         let text = String::from_utf8_lossy(&decoded);
-                        if let (Some(json_start), Some(json_end)) = (text.find('{'), text.rfind('}'))
+                        if let (Some(json_start), Some(json_end)) =
+                            (text.find('{'), text.rfind('}'))
                         {
                             return Some(text[json_start..=json_end].to_string());
                         }
@@ -470,9 +483,10 @@ fn read_antigravity_local_session() -> Result<AntigravityLocalSessionImportRespo
 #[tauri::command]
 pub fn get_antigravity_oauth_availability(app: AppHandle) -> OAuthAvailabilityResponse {
     let mut missing = Vec::new();
-    let has_client_id = runtime_antigravity_client_id().is_some() || compiled_antigravity_client_id().is_some();
-    let has_client_secret =
-        runtime_antigravity_client_secret().is_some() || compiled_antigravity_client_secret().is_some();
+    let has_client_id =
+        runtime_antigravity_client_id().is_some() || compiled_antigravity_client_id().is_some();
+    let has_client_secret = runtime_antigravity_client_secret().is_some()
+        || compiled_antigravity_client_secret().is_some();
 
     if !has_client_id {
         missing.push("TOKENFLOW_ANTIGRAVITY_CLIENT_ID".to_string());
@@ -506,10 +520,11 @@ pub fn import_antigravity_local_session(
 ) -> Result<AntigravityLocalSessionImportResponse, String> {
     let result = read_antigravity_local_session();
     match &result {
-        Ok(session) => append_debug_log(
-            &app,
-            "antigravity.oauth",
-            format!(
+        Ok(session) => {
+            append_debug_log(
+                &app,
+                "antigravity.oauth",
+                format!(
                 "import_local_session success email_present={} refresh_present={} expires_at={}",
                 session.email.as_ref().is_some_and(|value| !value.is_empty()),
                 session
@@ -523,7 +538,8 @@ pub fn import_antigravity_local_session(
                     .map(|value| value.to_rfc3339())
                     .unwrap_or_else(|| "none".to_string())
             ),
-        ),
+            )
+        }
         Err(err) => append_debug_log(
             &app,
             "antigravity.oauth",

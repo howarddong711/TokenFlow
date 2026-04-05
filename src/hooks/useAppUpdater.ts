@@ -8,6 +8,11 @@ export interface AppUpdateInfo {
   publishedAt?: string | null;
 }
 
+export interface AppUpdatePolicy {
+  channel: string;
+  inAppUpdatesEnabled: boolean;
+}
+
 export type AppUpdaterState =
   | { phase: "idle"; checkedAt?: string; update?: AppUpdateInfo; error?: string }
   | { phase: "checking"; checkedAt?: string; update?: AppUpdateInfo; error?: string }
@@ -27,9 +32,23 @@ function getErrorMessage(error: unknown) {
 
 export function useAppUpdater(autoUpdate: boolean) {
   const [state, setState] = useState<AppUpdaterState>({ phase: "idle" });
+  const [policy, setPolicy] = useState<AppUpdatePolicy>({
+    channel: "github",
+    inAppUpdatesEnabled: true,
+  });
   const autoStartedRef = useRef(false);
 
   const installUpdate = async (checkedAtOverride?: string, updateOverride?: AppUpdateInfo) => {
+    if (!policy.inAppUpdatesEnabled) {
+      setState((current) => ({
+        phase: "error",
+        checkedAt: checkedAtOverride ?? current.checkedAt,
+        update: updateOverride ?? current.update,
+        error: `In-app updates are disabled for channel: ${policy.channel}`,
+      }));
+      return;
+    }
+
     setState((current) => ({
       phase: "installing",
       checkedAt: checkedAtOverride ?? current.checkedAt,
@@ -57,6 +76,15 @@ export function useAppUpdater(autoUpdate: boolean) {
     autoInstall?: boolean;
     silentIfUpToDate?: boolean;
   }) => {
+    if (!policy.inAppUpdatesEnabled) {
+      setState((current) => ({
+        phase: "idle",
+        checkedAt: current.checkedAt,
+        update: current.update,
+      }));
+      return;
+    }
+
     setState((current) => ({
       phase: "checking",
       checkedAt: current.checkedAt,
@@ -101,16 +129,48 @@ export function useAppUpdater(autoUpdate: boolean) {
   });
 
   useEffect(() => {
-    if (import.meta.env.DEV || !autoUpdate || autoStartedRef.current) {
+    if (
+      import.meta.env.DEV ||
+      !autoUpdate ||
+      autoStartedRef.current ||
+      !policy.inAppUpdatesEnabled
+    ) {
       return;
     }
 
     autoStartedRef.current = true;
     runAutoUpdate();
-  }, [autoUpdate]);
+  }, [autoUpdate, policy.inAppUpdatesEnabled]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPolicy = async () => {
+      try {
+        const next = await invoke<AppUpdatePolicy>("get_app_update_policy");
+        if (!cancelled) {
+          setPolicy(next);
+        }
+      } catch {
+        if (!cancelled) {
+          setPolicy({
+            channel: "github",
+            inAppUpdatesEnabled: true,
+          });
+        }
+      }
+    };
+
+    void loadPolicy();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return {
     state,
+    policy,
     checkForUpdates,
     installUpdate: () => installUpdate(),
   };

@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true,
+    "targets": "all"
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/howarddong711/TokenFlow/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

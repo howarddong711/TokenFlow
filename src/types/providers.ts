@@ -109,6 +109,8 @@ export interface ProviderCapabilityDto {
   auth_kinds: AccountAuthKind[];
   prefers_native_oauth: boolean;
   system_managed_only: boolean;
+  platform_status: "full" | "partial" | "unsupported";
+  platform_note?: string;
 }
 
 export type OpenAIAuthMode = "api_key" | "chatgpt_oauth";

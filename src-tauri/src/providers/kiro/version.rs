@@ -170,6 +170,25 @@ pub fn find_kiro_cli() -> Option<PathBuf> {
                 }
             }
 
+            #[cfg(target_os = "macos")]
+            {
+                let mut possible_paths = vec![
+                    PathBuf::from("/Applications/Kiro.app/Contents/Resources/app/bin/kiro-cli"),
+                    PathBuf::from("/Applications/Kiro.app/Contents/MacOS/kiro-cli"),
+                    PathBuf::from("/opt/homebrew/bin/kiro-cli"),
+                    PathBuf::from("/usr/local/bin/kiro-cli"),
+                ];
+                if let Some(home) = dirs::home_dir() {
+                    possible_paths.push(home.join(".local").join("bin").join("kiro-cli"));
+                }
+
+                for path in possible_paths {
+                    if path.exists() {
+                        return Some(path);
+                    }
+                }
+            }
+
             None
         })
         .clone()
